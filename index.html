@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Interactive optics demonstrations</title>
+<style>
+:root{
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+  --bg:#f7f7f5;--panel:#ffffff;--text:#1d1d1f;--muted:#6b6b70;--border:#e2e2dc;--accent:#059669;--a2:#2563eb;--a3:#dc2626;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){--bg:#17181a;--panel:#212326;--text:#ececec;--muted:#9a9aa0;--border:#34363a;--accent:#34d399;--a2:#6ea0ff;--a3:#ff7b7b;color-scheme:dark}
+}
+:root[data-theme="dark"]{--bg:#17181a;--panel:#212326;--text:#ececec;--muted:#9a9aa0;--border:#34363a;--accent:#34d399;--a2:#6ea0ff;--a3:#ff7b7b;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:1000px;margin:0 auto;padding:28px 16px 48px}
+h1{font-size:1.8rem;margin:0 0 .3em}
+.intro{color:var(--muted);margin:0 0 8px;max-width:46em}
+h2{font-size:1.1rem;margin:2em 0 .7em;padding-bottom:.3em;border-bottom:1px solid var(--border)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:14px}
+a.card{display:block;background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:14px;text-decoration:none;color:inherit;transition:transform .12s,border-color .12s,box-shadow .12s}
+a.card:hover,a.card:focus-visible{transform:translateY(-2px);border-color:var(--accent);box-shadow:0 6px 18px rgba(0,0,0,.08);outline:none}
+a.card svg{display:block;width:100%;height:76px;margin-bottom:10px;color:var(--muted)}
+a.card h3{font-size:1.02rem;margin:0 0 .25em}
+a.card p{margin:0 0 .5em;font-size:.9rem;color:var(--muted)}
+a.card .vary{font-size:.8rem;color:var(--accent)}
+footer{margin-top:3em;font-size:.85rem;color:var(--muted)}
+</style>
+<!-- To customise: edit the title, the intro text and the footer below. Links are relative, so keep all files in the same folder. -->
+</head>
+<body>
+<main>
+  <h1>Interactive optics demonstrations</h1>
+  <p class="intro">Short fundamental optics simulations to explore polarisation, interference and diffraction. Everything runs in your browser: there is nothing to install and no login. Best viewed on a computer, but they also work on tablets and phones.</p>
+
+  <h2>Polarisation</h2>
+  <div class="grid">
+    <a class="card" href="pages/Polarisation_superposition_linear.html">
+      <svg viewBox="0 0 120 76" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+        <path d="M14 38h92M60 6v64" opacity=".5"/>
+        <path d="M60 38h34" stroke="var(--a2)" stroke-width="3"/><path d="M60 38V12" stroke="var(--a3)" stroke-width="3"/>
+        <path d="M60 38L94 12" stroke="var(--accent)" stroke-width="3"/><path d="M94 38V12h-34" stroke-dasharray="3 3" opacity=".6"/>
+      </svg>
+      <h3>Superposition of linear polarisations</h3>
+      <p>Add two orthogonal linear fields and see the resulting polarisation appear.</p>
+      <div class="vary">Vary: relative amplitude, relative phase</div>
+    </a>
+    <a class="card" href="pages/Polarisation_superposition_circular.html">
+      <svg viewBox="0 0 120 76" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+        <path d="M14 38h92M60 6v64" opacity=".5"/><circle cx="60" cy="38" r="26" stroke-dasharray="3 3" opacity=".7"/>
+        <path d="M60 38l18-18" stroke="var(--a2)" stroke-width="3"/><path d="M60 38l18 18" stroke="var(--a3)" stroke-width="3"/>
+        <path d="M60 38h36" stroke="var(--accent)" stroke-width="3"/>
+      </svg>
+      <h3>Superposition of circular polarisations</h3>
+      <p>Combine right and left circular polarisations and see the resulting polarisation appear.</p>
+      <div class="vary">Vary: relative amplitude, relative phase</div>
+    </a>
+  </div>
+
+  <h2>Interference</h2>
+  <div class="grid">
+    <a class="card" href="pages/Interference_two_plane_waves.html">
+      <svg viewBox="0 0 120 76" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+        <g stroke="var(--a2)" opacity=".8"><path d="M10 60L50 10M24 66L64 16M38 72L78 22M-4 54L36 4"/></g>
+        <g stroke="var(--a3)" opacity=".8"><path d="M110 60L70 10M96 66L56 16M82 72L42 22M124 54L84 4"/></g>
+        <path d="M60 4v68" stroke="var(--accent)" stroke-width="2" stroke-dasharray="2 4"/>
+      </svg>
+      <h3>Interference of two plane waves</h3>
+      <p>Choose the direction of two waves in 3D and see the fringes they form on a screen.</p>
+      <div class="vary">Vary: both wave directions, relative amplitude, wavelength</div>
+    </a>
+  </div>
+
+  <h2>Diffraction</h2>
+  <div class="grid">
+    <a class="card" href="pages/Diffraction_single_slit.html">
+      <svg viewBox="0 0 120 76" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+        <path d="M30 6v28M30 42v28" stroke-width="4"/>
+        <path d="M44 66C60 66 64 64 68 56S74 14 80 14s6 30 10 42 8 10 18 10" stroke="var(--accent)" stroke-width="2.2"/>
+        <path d="M6 38h20" stroke="var(--a2)" stroke-width="2"/>
+      </svg>
+      <h3>Diffraction by a single slit</h3>
+      <p>Far-field diffraction pattern of one slit in the Fraunhofer approximation.</p>
+      <div class="vary">Vary: slit width, wavelength, display range</div>
+    </a>
+    <a class="card" href="pages/Diffraction_two_slits.html">
+      <svg viewBox="0 0 120 76" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+        <path d="M30 6v20M30 32v12M30 50v20" stroke-width="4"/>
+        <path d="M6 38h20" stroke="var(--a2)" stroke-width="2"/>
+        <path d="M44 66c8 0 8-40 16-40s8 40 16 40 8-40 16-40 8 40 14 40" stroke="var(--accent)" stroke-width="2.2"/>
+        <path d="M44 66C60 66 66 12 80 12s20 54 36 54" stroke="currentColor" stroke-dasharray="3 3" opacity=".6"/>
+      </svg>
+      <h3>Diffraction by two slits</h3>
+      <p>Far-field diffraction pattern of two slits (Young's slits) in the Fraunhofer approximation.</p>
+      <div class="vary">Vary: slit width, slit separation, wavelength</div>
+    </a>
+    <a class="card" href="pages/Diffraction_aperture.html">
+      <svg viewBox="0 0 120 76" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+        <rect x="8" y="12" width="40" height="52" rx="3" opacity=".6"/><path d="M20 50L28 22l8 28z" fill="currentColor" opacity=".7"/>
+        <path d="M54 38h12" stroke="var(--a2)" stroke-width="2"/>
+        <g stroke="var(--accent)" stroke-width="2"><circle cx="90" cy="38" r="5" fill="var(--accent)"/><circle cx="90" cy="38" r="14" opacity=".7"/><circle cx="90" cy="38" r="23" opacity=".4"/></g>
+      </svg>
+      <h3>Diffraction by an aperture.</h3>
+      <p>Draw your own aperture on a grid and see the resulting far field diffraction pattern in the Fraunhofer approximation.</p>
+      <div class="vary">Vary: the shape, its size, wavelength</div>
+    </a>
+    <a class="card" href="pages/Diffraction_grating.html">
+      <svg viewBox="0 0 120 76" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+        <path d="M30 6v8M30 20v8M30 34v8M30 48v8M30 62v8" stroke-width="4"/>
+        <path d="M6 38h20" stroke="var(--a2)" stroke-width="2"/>
+        <g stroke-width="4"><path d="M96 34h14" stroke="var(--accent)"/><path d="M92 18h12" stroke="#d946ef"/><path d="M98 22h12" stroke="#f59e0b"/><path d="M92 54h12" stroke="#dc2626"/><path d="M98 58h12" stroke="#3b82f6"/></g>
+        <path d="M34 38L90 18M34 38L90 38M34 38L90 58" opacity=".5" stroke-dasharray="3 3"/>
+      </svg>
+      <h3>Diffraction grating</h3>
+      <p>See the far field diffraction pattern by a grating made of N slits.</p>
+      <div class="vary">Vary: number of slits, spacing, slit width, wavelengths</div>
+    </a>
+  </div>
+
+  <footer>
+    <p>Demonstrations created by Baptiste Jayet (baptiste.jayet@tyndall.ie) with the help of Claude Sonnet 5.5</p>
+  </footer>
+</main>
+</body>
+</html>

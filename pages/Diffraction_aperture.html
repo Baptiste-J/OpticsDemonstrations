@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Diffraction by an aperture of arbitrary shape</title>
+<style>
+:root{
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+  --bg:#f7f7f5;--panel:#ffffff;--text:#1d1d1f;--muted:#6b6b70;--grid:#d9d9d4;--border:#e2e2dc;--cs:#059669;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){--bg:#17181a;--panel:#212326;--text:#ececec;--muted:#9a9aa0;--grid:#3a3c40;--border:#34363a;--cs:#34d399;color-scheme:dark}
+}
+:root[data-theme="dark"]{--bg:#17181a;--panel:#212326;--text:#ececec;--muted:#9a9aa0;--grid:#3a3c40;--border:#34363a;--cs:#34d399;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:1500px;margin:0 auto;padding:16px}
+h1{font-size:1.35rem;margin:.2em 0 .6em}
+h2{font-size:1rem;margin:0 0 8px;color:var(--muted);font-weight:600}
+p.sub{margin:0;color:var(--muted);font-size:.82rem}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:12px}
+canvas{display:block;width:var(--pw);aspect-ratio:1/1;margin:0 auto}
+.sized{--pw:min(100%,max(280px,calc(100vh - 340px)))}
+.pwrap{width:min(100%,max(280px,calc(100vh - 340px)));margin:0 auto;display:grid;grid-template-columns:1fr .26fr}
+.pwrap canvas{width:100%;margin:0}
+#cvp{aspect-ratio:1/1;touch-action:none;cursor:crosshair}
+#cvy{aspect-ratio:.26/1}
+#cvx{aspect-ratio:1/.26}
+#cva{touch-action:none;cursor:crosshair}
+.views{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) 310px;gap:16px;align-items:start}
+@media (max-width:1100px){.views{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.controls{grid-column:1 / -1;position:static !important;max-height:none !important}}
+@media (max-width:760px){.views{grid-template-columns:minmax(0,1fr)}}
+.controls{display:grid;gap:10px;position:sticky;top:12px;max-height:calc(100vh - 24px);overflow-y:auto}
+.sl{margin-bottom:6px}
+label{display:flex;justify-content:space-between;font-size:.92rem;margin-bottom:2px}
+label b{font-variant-numeric:tabular-nums}
+input[type=range]{width:100%}
+.row{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+button{background:var(--panel);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:4px 10px;font:inherit;font-size:.85rem;cursor:pointer}
+button:hover{border-color:var(--muted)}
+button.on{border-color:var(--cs);color:var(--cs)}
+.state{font-size:.9rem}
+.state strong{color:var(--cs)}
+.back{display:inline-block;margin:0 0 6px;font-size:.9rem;color:var(--muted);text-decoration:none}
+.back:hover{color:var(--cs);text-decoration:underline}
+</style>
+</head>
+<body>
+<main>
+  <a class="back" href="../index.html">← Back to the menu</a>
+  <h1>Diffraction by an aperture of arbitrary shape</h1>
+
+  <div class="views">
+    <div class="card sized">
+      <h2>Aperture: draw a shape or choose a preset</h2>
+      <canvas id="cva"></canvas>
+      <div class="row" id="tools"></div>
+      <div class="row" id="presets"></div>
+      <p class="sub" style="margin-top:8px">White = open, black = opaque. The grid is 128 × 128 cells. Click a black cell to open it or a white cell to block it, and drag to paint with the same action.</p>
+    </div>
+
+    <div class="card">
+      <h2>Diffraction pattern on the screen</h2>
+      <div class="pwrap">
+        <canvas id="cvp"></canvas>
+        <canvas id="cvy"></canvas>
+        <canvas id="cvx"></canvas>
+        <div></div>
+      </div>
+      <div class="row" id="curRow"></div>
+      <p class="sub" style="margin-top:8px">Far-field (Fraunhofer) intensity, computed as the squared modulus of the 2D Fourier transform of the aperture. The screen is 40 mm × 40 mm at L = 1 m, and the intensity is normalised to the central maximum. Click or drag on the pattern to place the dashed lines: the plot below shows the intensity along the horizontal line, and the plot on the right along the vertical line (positions in mm).</p>
+      <div class="state" id="state" style="margin-top:8px"></div>
+    </div>
+
+    <div class="card controls">
+      <div>
+        <div class="sl"><label for="ap"><span>Size of the aperture window, D</span> <b id="apv"></b></label><input id="ap" type="range" min="150" max="600" step="10" value="300"></div>
+        <div class="sl"><label for="lam"><span>Wavelength, λ</span> <b id="lamv"></b></label><input id="lam" type="range" min="400" max="750" step="5" value="550"></div>
+        <div class="sl"><label for="sz"><span>Preset size</span> <b id="szv"></b></label><input id="sz" type="range" min="5" max="100" step="1" value="50"></div>
+        <div class="sl"><label for="br"><span>Brush size</span> <b id="brv"></b></label><input id="br" type="range" min="1" max="16" step="1" value="4"></div>
+        <div class="sl"><label for="mx"><span>Display maximum (fraction of peak)</span> <b id="mxv"></b></label><input id="mx" type="range" min="0" max="3" step="0.05" value="3">
+          <p class="sub">Lowering it saturates the central peak so that weak features become visible.</p></div>
+      </div>
+      <div class="row" id="scales"></div>
+    </div>
+  </div>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const cva = $('cva'), ca = cva.getContext('2d'), cvp = $('cvp'), cp = cvp.getContext('2d'), cvx = $('cvx'), cpx = cvx.getContext('2d'), cvy = $('cvy'), cpy = cvy.getContext('2d');
+const colr = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const G = 128, M = 1024, N = 400, KMAX = 256, XW = 40, L_M = 1, MG = 0.075;     // grid, FFT size, display pixels, screen window (mm), distance (m), margin
+const A = new Float32Array(G*G);                                    // aperture transmission, 0 (opaque) ... 1 (open); row 0 is the top
+const re = new Float64Array(M*M), im = new Float64Array(M*M), S = new Float32Array(M*M);   // FFT work arrays; S = shifted intensity
+const apc = document.createElement('canvas'); apc.width = apc.height = G;
+const actx = apc.getContext('2d'), aimg = actx.createImageData(G,G);
+const pat = document.createElement('canvas'); pat.width = pat.height = N;
+const pctx = pat.getContext('2d'), pimg = pctx.createImageData(N,N);
+let paintVal = 1, scale = 'log', current = 'circle', needFFT = true, needRes = true, sumA = 0;
+
+// ---------- FFT (radix-2, in place) ----------
+const rev = new Uint16Array(M), cosT = new Float64Array(M/2), sinT = new Float64Array(M/2);
+for (let i = 0; i < M; i++){ let r = 0, x = i; for (let b = 0; b < 10; b++){ r = (r << 1) | (x & 1); x >>= 1; } rev[i] = r; }
+for (let k = 0; k < M/2; k++){ cosT[k] = Math.cos(2*Math.PI*k/M); sinT[k] = -Math.sin(2*Math.PI*k/M); }
+function fft1(tr, ti){
+  for (let i = 0; i < M; i++){ const j = rev[i]; if (j > i){ let t = tr[i]; tr[i] = tr[j]; tr[j] = t; t = ti[i]; ti[i] = ti[j]; ti[j] = t; } }
+  for (let len = 2; len <= M; len <<= 1){
+    const half = len >> 1, step = M/len;
+    for (let i = 0; i < M; i += len) for (let k = 0; k < half; k++){
+      const wr = cosT[k*step], wi = sinT[k*step], a = i+k, b = a+half;
+      const xr = tr[b]*wr - ti[b]*wi, xi = tr[b]*wi + ti[b]*wr;
+      tr[b] = tr[a]-xr; ti[b] = ti[a]-xi; tr[a] += xr; ti[a] += xi;
+    }
+  }
+}
+const tr = new Float64Array(M), ti = new Float64Array(M);
+// Far-field amplitude = 2D Fourier transform of the aperture (zero-padded to M x M); intensity = |amplitude|²
+function computeFFT(){
+  re.fill(0); im.fill(0);
+  const off = (M-G)/2; sumA = 0;
+  for (let gy = 0; gy < G; gy++){                                   // row transforms (only the G rows that contain data)
+    tr.fill(0); ti.fill(0);
+    for (let gx = 0; gx < G; gx++){ tr[off+gx] = A[gy*G+gx]; sumA += A[gy*G+gx]; }
+    fft1(tr, ti);
+    re.set(tr, (off+gy)*M); im.set(ti, (off+gy)*M);
+  }
+  for (let kx = -KMAX; kx <= KMAX; kx++){ const c = (kx + M) % M;     // column transforms (only the columns that can appear in the 40 mm window)
+    for (let r = 0; r < M; r++){ tr[r] = re[r*M+c]; ti[r] = im[r*M+c]; }
+    fft1(tr, ti);
+    const cs = (c + M/2) % M;
+    for (let r = 0; r < M; r++) S[((r + M/2) % M)*M + cs] = tr[r]*tr[r] + ti[r]*ti[r];
+  }
+}
+
+// ---------- display ----------
+const dmax = () => Math.pow(10, +$('mx').value - 3);
+const disp = (I, m) => scale === 'lin' ? Math.min(1, I/m) : Math.min(1, Math.max(0, (Math.log10(Math.max(I/m,1e-12))+4)/4));
+function wl2rgb(w){
+  let r = 0, g = 0, b = 0;
+  if (w < 440){ r = (440-w)/60; b = 1; } else if (w < 490){ g = (w-440)/50; b = 1; } else if (w < 510){ g = 1; b = (510-w)/20; }
+  else if (w < 580){ r = (w-510)/70; g = 1; } else if (w < 645){ r = 1; g = (645-w)/65; } else r = 1;
+  const f = w < 420 ? 0.3+0.7*(w-400)/20 : w > 700 ? 0.3+0.7*(750-w)/50 : 1;
+  return [r,g,b].map(c => Math.pow(c*f, 0.8));
+}
+// Screen sampling: the FFT sample spacing on the screen is λ L G / (M D), so the physical window is resampled from the FFT output.
+const CUR_COL = ['#f59e0b','#0ea5e9'];                 // colours of the horizontal and the vertical line and of their plots
+let cur = [0,0];                                       // position of the lines on the screen in mm (x right, y up)
+const NP = 400, profX = new Float32Array(NP), profY = new Float32Array(NP);   // display-scaled intensity along the x and y axes
+function sampleI(xm, ym, dx){                                      // bilinear sample of the FFT intensity at screen position (xm, ym) in mm (ym downwards)
+  const c0 = M/2, fx = c0 + xm/dx, fy = c0 + ym/dx, ix = Math.floor(fx), iy = Math.floor(fy);
+  if (ix < 0 || ix >= M-1 || iy < 0 || iy >= M-1) return 0;
+  const wx = fx-ix, wy = fy-iy, o = iy*M + ix;
+  return (S[o]*(1-wx) + S[o+1]*wx)*(1-wy) + (S[o+M]*(1-wx) + S[o+M+1]*wx)*wy;
+}
+function resample(){
+  const lam = +$('lam').value, D = +$('ap').value, dx = lam*L_M*G/(M*D), rgb = wl2rgb(lam), m = dmax();
+  const inv = sumA > 1e-9 ? 1/(sumA*sumA) : 0, px = pimg.data;
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++){
+    const v = inv ? disp(sampleI((i+.5)/N*XW-XW/2, (j+.5)/N*XW-XW/2, dx)*inv, m) : 0, q = (j*N+i)*4;
+    px[q] = rgb[0]*255*v; px[q+1] = rgb[1]*255*v; px[q+2] = rgb[2]*255*v; px[q+3] = 255;
+  }
+  pctx.putImageData(pimg,0,0);
+  computeProfiles();
+}
+function computeProfiles(){
+  const lam = +$('lam').value, D = +$('ap').value, dx = lam*L_M*G/(M*D), m = dmax(), inv = sumA > 1e-9 ? 1/(sumA*sumA) : 0;
+  for (let i = 0; i < NP; i++){
+    const t = (i+.5)/NP*XW - XW/2;
+    profX[i] = inv ? disp(sampleI(t, -cur[1], dx)*inv, m) : 0;     // along x, at the height of the horizontal line
+    profY[i] = inv ? disp(sampleI(cur[0], t, dx)*inv, m) : 0;      // along y, at the position of the vertical line (i = 0 is the top)
+  }
+}
+
+// ---------- aperture editing ----------
+const SHAPES = {
+  circle:    (u,v,h) => u*u+v*v <= h*h,
+  square:    (u,v,h) => Math.abs(u) <= h && Math.abs(v) <= h,
+  rectangle: (u,v,h) => Math.abs(u) <= h && Math.abs(v) <= h/2,
+  slit:      (u,v,h) => Math.abs(u) <= h/8 && Math.abs(v) <= h,
+  triangle:  (u,v,h) => v >= -h/2 && Math.abs(u) <= (h - v)/Math.sqrt(3),
+  hexagon:   (u,v,h) => Math.abs(v) <= Math.sqrt(3)/2*h && Math.abs(u) + Math.abs(v)/Math.sqrt(3) <= h,
+  ring:      (u,v,h) => { const r2 = u*u+v*v; return r2 <= h*h && r2 >= 0.49*h*h; },
+  cross:     (u,v,h) => (Math.abs(u) <= h/4 && Math.abs(v) <= h) || (Math.abs(v) <= h/4 && Math.abs(u) <= h),
+  'two holes': (u,v,h) => Math.pow(Math.abs(u)-0.6*h,2) + v*v <= Math.pow(0.35*h,2)
+};
+function fillShape(name){
+  const h = +$('sz').value/100, f = SHAPES[name];
+  for (let gy = 0; gy < G; gy++) for (let gx = 0; gx < G; gx++){            // 4 x 4 supersampling gives anti-aliased edges
+    let c = 0;
+    for (let sy = 0; sy < 4; sy++) for (let sx = 0; sx < 4; sx++)
+      if (f((gx+(sx+.5)/4)/G*2-1, 1-(gy+(sy+.5)/4)/G*2, h)) c++;
+    A[gy*G+gx] = c/16;
+  }
+  changed();
+}
+function changed(){
+  for (let i = 0; i < G*G; i++){ const v = A[i]*255, o = i*4; aimg.data[o] = aimg.data[o+1] = aimg.data[o+2] = v; aimg.data[o+3] = 255; }
+  actx.putImageData(aimg,0,0); needFFT = true; ui();
+}
+function paint(gx, gy){
+  const R = +$('br').value/2 + 0.25, val = paintVal;
+  for (let y = Math.max(0,Math.floor(gy-R)); y <= Math.min(G-1,Math.ceil(gy+R)); y++)
+    for (let x = Math.max(0,Math.floor(gx-R)); x <= Math.min(G-1,Math.ceil(gx+R)); x++)
+      if (Math.hypot(x+.5-gx, y+.5-gy) <= R) A[y*G+x] = val;
+}
+let last = null;
+const toGrid = e => { const r = cva.getBoundingClientRect(), f = 1-2*MG;
+  return [((e.clientX-r.left)/r.width-MG)/f*G, ((e.clientY-r.top)/r.height-MG)/f*G]; };
+cva.addEventListener('pointerdown', e => {
+  const p = toGrid(e), gx = Math.floor(p[0]), gy = Math.floor(p[1]);
+  if (gx < 0 || gx >= G || gy < 0 || gy >= G) return;
+  paintVal = A[gy*G+gx] < 0.5 ? 1 : 0;              // clicking a black cell opens it, clicking a white cell blocks it
+  last = p; current = null; cva.setPointerCapture(e.pointerId); e.preventDefault(); paint(p[0],p[1]); changed();
+});
+cva.addEventListener('pointermove', e => {
+  if (!last) return;
+  const p = toGrid(e), n = Math.max(1, Math.ceil(Math.hypot(p[0]-last[0], p[1]-last[1])*2));
+  for (let k = 1; k <= n; k++) paint(last[0]+(p[0]-last[0])*k/n, last[1]+(p[1]-last[1])*k/n);
+  last = p; changed();
+});
+['pointerup','pointercancel'].forEach(ev => cva.addEventListener(ev, () => { last = null; }));
+
+// ---------- controls ----------
+const addBtn = (box, txt, fn, key) => { const b = document.createElement('button'); b.textContent = txt; b.dataset.k = key || txt; b.onclick = fn; $(box).appendChild(b); };
+addBtn('tools','Clear',() => { A.fill(0); current = null; changed(); },'clear');
+Object.keys(SHAPES).forEach(n => addBtn('presets', n[0].toUpperCase()+n.slice(1), () => { current = n; fillShape(n); }, 'shape:'+n));
+addBtn('scales','Linear intensity',() => { scale = 'lin'; needRes = true; ui(); },'scale:lin');
+addBtn('scales','Logarithmic (4 decades)',() => { scale = 'log'; needRes = true; ui(); },'scale:log');
+['ap','lam','mx'].forEach(id => $(id).addEventListener('input', () => { needRes = true; ui(); }));
+$('sz').addEventListener('input', () => { if (current) fillShape(current); else ui(); });
+$('br').addEventListener('input', ui);
+
+function niceStep(r){ const e = Math.pow(10, Math.floor(Math.log10(r))), f = r/e; return (f < 1.5 ? 1 : f < 3.5 ? 2 : f < 7.5 ? 5 : 10)*e; }
+function ui(){
+  const D = +$('ap').value, lam = +$('lam').value, dm = dmax()*100;
+  $('apv').textContent = D + ' µm'; $('lamv').textContent = lam + ' nm'; $('szv').textContent = $('sz').value + ' %';
+  $('brv').textContent = $('br').value + (+$('br').value === 1 ? ' cell' : ' cells');
+  $('mxv').textContent = (dm >= 9.5 ? dm.toFixed(0) : dm.toFixed(1)) + ' %';
+  document.querySelectorAll('button[data-k]').forEach(b => { const k = b.dataset.k;
+    b.classList.toggle('on', k === 'scale:'+scale || (current && k === 'shape:'+current)); });
+  $('state').innerHTML = `Aperture window D = ${D} µm (one cell = ${(D/G).toFixed(1)} µm). Open area: <strong>${(sumA/(G*G)*100).toFixed(1)} %</strong> of the window. ` +
+    `A feature of size s in the aperture gives structure of size about λL/s on the screen. For s = D this is <strong>${(lam*L_M/D).toFixed(2)} mm</strong>.`;
+}
+
+// ---------- drawing ----------
+function line(c, pts, color, w, a = 1){
+  c.strokeStyle = color; c.lineWidth = w; c.globalAlpha = a; c.lineJoin = 'round'; c.lineCap = 'round'; c.beginPath();
+  pts.forEach((p,i) => i ? c.lineTo(p[0],p[1]) : c.moveTo(p[0],p[1])); c.stroke(); c.globalAlpha = 1;
+}
+function tag(c, txt, x, y){ c.lineWidth = 3; c.strokeStyle = 'rgba(0,0,0,.65)'; c.fillStyle = '#fff'; c.strokeText(txt,x,y); c.fillText(txt,x,y); }
+function axisArrow(c, p0, p1){
+  line(c,[p0,p1],'rgba(0,0,0,.65)',4); line(c,[p0,p1],'#fff',1.6);
+  const dx = p1[0]-p0[0], dy = p1[1]-p0[1], L = Math.hypot(dx,dy), ux = dx/L, uy = dy/L, h = 11;
+  c.beginPath(); c.moveTo(p1[0],p1[1]); c.lineTo(p1[0]-h*ux+h*.45*uy, p1[1]-h*uy-h*.45*ux); c.lineTo(p1[0]-h*ux-h*.45*uy, p1[1]-h*uy+h*.45*ux); c.closePath();
+  c.fillStyle = '#fff'; c.strokeStyle = 'rgba(0,0,0,.65)'; c.lineWidth = 1.5; c.fill(); c.stroke();
+}
+function axes(c, W, H){
+  const m = W*MG, S_ = W-2*m, cx = W/2, cy = H/2, reach = S_/2 + 0.8*m;
+  axisArrow(c,[cx,cy],[cx+reach,cy]); axisArrow(c,[cx,cy],[cx,cy-reach]);
+  c.fillStyle = colr('--text'); c.fillText('x',cx+reach-8,cy+20); c.fillText('y',cx+12,cy-reach+14);
+}
+function drawAperture(){
+  const W = cva.clientWidth, H = cva.clientHeight, m = W*MG, S_ = W-2*m;
+  ca.clearRect(0,0,W,H); ca.imageSmoothingEnabled = false; ca.drawImage(apc,m,m,S_,S_);
+  for (let k = G/8; k < G; k += G/8){ const t = m + S_*k/G; line(ca,[[t,m],[t,m+S_]],'#888',1,0.25); line(ca,[[m,t],[m+S_,t]],'#888',1,0.25); }
+  ca.strokeStyle = colr('--muted'); ca.lineWidth = 1; ca.strokeRect(m,m,S_,S_);
+  ca.font = '13px system-ui,sans-serif'; axes(ca,W,H);
+  const D = +$('ap').value, bar = niceStep(D/4); line(ca,[[m+14,m+S_-22],[m+14+bar/D*S_,m+S_-22]],'#fff',3); tag(ca,bar+' µm',m+14,m+S_-28);
+}
+function drawCursor(c, W, H){
+  const m = W*MG, S_ = W-2*m, px = m + S_*(cur[0]+XW/2)/XW, py = m + S_*(XW/2-cur[1])/XW;
+  c.setLineDash([6,5]);
+  line(c,[[m,py],[m+S_,py]],'rgba(0,0,0,.6)',3.5); line(c,[[m,py],[m+S_,py]],CUR_COL[0],1.6);
+  line(c,[[px,m],[px,m+S_]],'rgba(0,0,0,.6)',3.5); line(c,[[px,m],[px,m+S_]],CUR_COL[1],1.6);
+  c.setLineDash([]);
+  c.fillStyle = '#fff'; c.strokeStyle = 'rgba(0,0,0,.8)'; c.lineWidth = 1.5; c.beginPath(); c.arc(px,py,4.5,0,7); c.fill(); c.stroke();
+}
+function drawPattern(){
+  const W = cvp.clientWidth, H = cvp.clientHeight, m = W*MG, S_ = W-2*m;
+  cp.imageSmoothingEnabled = true; cp.clearRect(0,0,W,H); cp.drawImage(pat,m,m,S_,S_);
+  cp.strokeStyle = colr('--muted'); cp.lineWidth = 1; cp.strokeRect(m,m,S_,S_);
+  cp.font = '13px system-ui,sans-serif'; axes(cp,W,H); drawCursor(cp,W,H);
+  line(cp,[[m+14,m+S_-22],[m+14+10/XW*S_,m+S_-22]],'#fff',3); tag(cp,'10 mm',m+14,m+S_-28);
+}
+
+// ---------- 1D plots along the x and y axes ----------
+const sup = n => String(n).split('').map(d => '⁰¹²³⁴⁵⁶⁷⁸⁹'[d]).join('');
+function fmtTick(v){
+  if (v >= 0.01 && v <= 1) return String(+v.toPrecision(2));
+  const e = Math.floor(Math.log10(v)+1e-9), mt = v/Math.pow(10,e);
+  return (Math.abs(mt-1) < 0.05 ? '' : Math.round(mt)+'×') + '10' + (e < 0 ? '⁻' : '') + sup(Math.abs(e));
+}
+function tickSet(){
+  const m = dmax();
+  return scale === 'lin' ? [[0,'0'],[0.5,fmtTick(m/2)],[1,fmtTick(m)]] : [0,0.5,1].map(p => [p, fmtTick(m*Math.pow(10,4*(p-1)))]);
+}
+const fmtmm = v => (v < -0.05 ? '−' : '') + Math.abs(v).toFixed(1);
+function drawProfX(){
+  const c = cpx, W = cvx.clientWidth, H = cvx.clientHeight; c.clearRect(0,0,W,H);
+  const m = W*MG, x0 = m, pw = W-2*m, top = 6, bot = H-20, ph = bot-top;
+  const muted = colr('--muted'), grid = colr('--grid'), green = CUR_COL[0];
+  c.font = '11px system-ui,sans-serif'; c.textAlign = 'left'; c.fillStyle = muted;
+  tickSet().forEach(([v,t]) => { const y = bot-ph*v; line(c,[[x0,y],[x0+pw,y]],grid,1); c.fillText(t,x0+3,y-3); });
+  const pts = Array.from(profX, (v,i) => [x0+pw*(i+.5)/NP, bot-ph*v]);
+  c.fillStyle = green; c.globalAlpha = 0.15; c.beginPath(); c.moveTo(x0,bot); pts.forEach(q => c.lineTo(q[0],q[1])); c.lineTo(x0+pw,bot); c.closePath(); c.fill(); c.globalAlpha = 1;
+  line(c,pts,green,1.8);
+  c.fillStyle = muted; c.textAlign = 'center';
+  for (let v = -XW/2; v <= XW/2; v += 10){ const X = x0+pw*(v+XW/2)/XW; line(c,[[X,bot],[X,bot+4]],muted,1); c.fillText(String(v),X,H-5); }
+  c.textAlign = 'right'; c.fillText('along x, at y = ' + fmtmm(cur[1]) + ' mm', x0+pw-3, top+11); c.textAlign = 'left';
+}
+function drawProfY(){
+  const c = cpy, W = cvy.clientWidth, H = cvy.clientHeight; c.clearRect(0,0,W,H);
+  const m = H*MG, S_ = H-2*m, left = 4, right = W-26, pw = right-left;
+  const muted = colr('--muted'), grid = colr('--grid'), green = CUR_COL[1];
+  c.font = '11px system-ui,sans-serif'; c.fillStyle = muted;
+  tickSet().forEach(([v,t],k) => { const X = left+pw*v; line(c,[[X,m],[X,m+S_]],grid,1);
+    c.textAlign = k === 0 ? 'left' : k === 2 ? 'right' : 'center'; c.fillText(t, X + (k === 0 ? 2 : k === 2 ? -2 : 0), m+12); });
+  const pts = Array.from(profY, (v,i) => [left+pw*v, m+S_*(i+.5)/NP]);
+  c.fillStyle = green; c.globalAlpha = 0.15; c.beginPath(); c.moveTo(left,m); pts.forEach(q => c.lineTo(q[0],q[1])); c.lineTo(left,m+S_); c.closePath(); c.fill(); c.globalAlpha = 1;
+  line(c,pts,green,1.8);
+  c.fillStyle = muted; c.textAlign = 'left';
+  for (let v = XW/2; v >= -XW/2; v -= 10){ const Y = m+S_*(XW/2-v)/XW; line(c,[[right,Y],[right+4,Y]],muted,1); c.fillText(String(v),right+6,Y+4); }
+  c.fillText('at x = ' + fmtmm(cur[0]) + ' mm', left, m-8);
+}
+
+const clampMM = v => Math.max(-XW/2, Math.min(XW/2, v));
+const toScreen = e => { const r = cvp.getBoundingClientRect(), f = 1-2*MG;
+  return [clampMM(((e.clientX-r.left)/r.width-MG)/f*XW-XW/2), -clampMM(((e.clientY-r.top)/r.height-MG)/f*XW-XW/2)]; };
+let dragCur = false;
+cvp.addEventListener('pointerdown', e => { dragCur = true; cvp.setPointerCapture(e.pointerId); e.preventDefault(); cur = toScreen(e); computeProfiles(); });
+cvp.addEventListener('pointermove', e => { if (dragCur){ cur = toScreen(e); computeProfiles(); } });
+['pointerup','pointercancel'].forEach(ev => cvp.addEventListener(ev, () => { dragCur = false; }));
+addBtn('curRow','Move the lines back to the centre',() => { cur = [0,0]; computeProfiles(); },'reset');
+
+function resize(){
+  const dpr = window.devicePixelRatio || 1;
+  [[cva,ca],[cvp,cp],[cvx,cpx],[cvy,cpy]].forEach(([c,x]) => { const r = c.getBoundingClientRect();
+    c.width = Math.round(r.width*dpr); c.height = Math.round(r.height*dpr); x.setTransform(dpr,0,0,dpr,0,0); });
+}
+addEventListener('resize', resize);
+
+function frame(){
+  if (needFFT){ computeFFT(); needFFT = false; needRes = true; ui(); }
+  if (needRes){ resample(); needRes = false; }
+  drawAperture(); drawPattern(); drawProfX(); drawProfY();
+  requestAnimationFrame(frame);
+}
+fillShape('circle'); resize(); ui(); requestAnimationFrame(frame);
+</script>
+</body>
+</html>

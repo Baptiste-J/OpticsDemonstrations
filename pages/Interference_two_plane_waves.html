@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Interference of two plane waves</title>
+<style>
+:root{
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+  --bg:#f7f7f5;--panel:#ffffff;--text:#1d1d1f;--muted:#6b6b70;--grid:#d9d9d4;--border:#e2e2dc;
+  --c1:#2563eb;--c2:#dc2626;--cs:#059669;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){--bg:#17181a;--panel:#212326;--text:#ececec;--muted:#9a9aa0;--grid:#3a3c40;--border:#34363a;--c1:#6ea0ff;--c2:#ff7b7b;--cs:#34d399;color-scheme:dark}
+}
+:root[data-theme="dark"]{--bg:#17181a;--panel:#212326;--text:#ececec;--muted:#9a9aa0;--grid:#3a3c40;--border:#34363a;--c1:#6ea0ff;--c2:#ff7b7b;--cs:#34d399;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:1500px;margin:0 auto;padding:16px}
+h1{font-size:1.35rem;margin:.2em 0 .6em}
+h2{font-size:1rem;margin:0 0 8px;color:var(--muted);font-weight:600}
+h3{font-size:.95rem;margin:0 0 8px;display:flex;align-items:center;gap:8px}
+h3::before{content:"";width:18px;height:4px;border-radius:2px;background:var(--dot,var(--muted))}
+p.sub{margin:0;color:var(--muted);font-size:.82rem}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:12px}
+canvas{display:block;width:100%;aspect-ratio:1/1}
+/* size the screen view and the profile so that both fit in the window height */
+.pcard{--pw:min(100%,max(280px,calc((100vh - 260px) / 1.36)))}
+#cvp,#cvl{width:var(--pw);margin-left:auto;margin-right:auto}
+#cvp{touch-action:none}
+#cvl{aspect-ratio:2.8/1}
+.views{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) 310px;gap:16px;align-items:start}
+@media (max-width:1100px){.views{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.controls{grid-column:1 / -1;position:static !important;max-height:none !important}}
+@media (max-width:760px){.views{grid-template-columns:minmax(0,1fr)}}
+.controls{display:grid;gap:10px;position:sticky;top:12px;max-height:calc(100vh - 24px);overflow-y:auto}
+.controls button{padding:4px 10px;font-size:.85rem}
+.controls h3{margin-bottom:4px}
+.sgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px 28px}
+.sl{margin-bottom:6px}
+label{display:flex;justify-content:space-between;font-size:.92rem;margin-bottom:2px}
+label b{font-variant-numeric:tabular-nums}
+input[type=range]{width:100%}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+button{background:var(--panel);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:6px 12px;font:inherit;font-size:.9rem;cursor:pointer}
+button:hover{border-color:var(--muted)}
+button.on{border-color:var(--cs);color:var(--cs)}
+.state strong{color:var(--cs)}
+.back{display:inline-block;margin:0 0 6px;font-size:.9rem;color:var(--muted);text-decoration:none}
+.back:hover{color:var(--cs);text-decoration:underline}
+</style>
+</head>
+<body>
+<main>
+  <a class="back" href="../index.html">← Back to the menu</a>
+  <h1>Interference of two plane waves</h1>
+
+  <div class="views">
+    <div class="card">
+      <h2>Geometry: the two wave vectors and the xy plane</h2>
+      <canvas id="cv3"></canvas>
+      <p class="sub" style="margin-top:8px">θ is the angle between a wave vector and the z axis. φ is the angle of its projection onto the xy plane, measured from the x axis.</p>
+    </div>
+    <div class="card pcard">
+      <h2 id="ptitle">Interference pattern in the xy plane</h2>
+      <canvas id="cvp"></canvas>
+      <h2 id="ltitle" style="margin:14px 0 4px"></h2>
+      <canvas id="cvl"></canvas>
+      <p class="sub" style="margin-top:8px">The square is 10 µm × 10 µm, the same region as the plane shown in the geometry view. Drag the end of the line A–B to rotate it about the centre; the profile below is taken along it. Intensity is normalised to its maximum possible value, (A₁+A₂)².</p>
+    </div>
+
+  <div class="card controls">
+    <div class="sgrid" id="sg"></div>
+    <div class="row" id="modes"></div>
+    <div class="row" id="presets"></div>
+    <div class="state" id="state"></div>
+  </div>
+  </div>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const cv3 = $('cv3'), c3 = cv3.getContext('2d'), cvp = $('cvp'), cp = cvp.getContext('2d'), cvl = $('cvl'), cl = cvl.getContext('2d');
+const colr = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const N = 280, LWIN = 10;                          // pattern resolution, window size in µm
+const pat = document.createElement('canvas'); pat.width = pat.height = N;
+const pctx = pat.getContext('2d'), img = pctx.createImageData(N,N);
+const MG = 0.075;                                  // margin around the image (fraction of the canvas width)
+let LA = [-4.5,0], LB = [4.5,0], drag = null;
+let mode = 'I', playing = true, dirty = true, t = 0, last = performance.now();
+
+// ---------- controls ----------
+const SL = [
+  {g:'Wave 1', dot:'--c1', items:[['th1','Polar angle θ₁',0,80,1,15,v=>v+'°'],['ph1','Azimuth φ₁',-180,180,1,0,v=>v+'°']]},
+  {g:'Wave 2', dot:'--c2', items:[['th2','Polar angle θ₂',0,80,1,15,v=>v+'°'],['ph2','Azimuth φ₂',-180,180,1,180,v=>v+'°']]},
+  {g:'Amplitude and wavelength', dot:'--cs', items:[['amp','Relative amplitude, A₂ / A₁',0,90,1,45,v=>{const r=Math.tan(v*Math.PI/180);return r>99?'∞':r.toFixed(2)}],['lam','Wavelength λ',0.4,2,0.05,1,v=>(+v).toFixed(2)+' µm']]}
+];
+SL.forEach(s => {
+  const d = document.createElement('div');
+  d.innerHTML = `<h3 style="--dot:var(${s.dot})">${s.g}</h3>` + s.items.map(([id,name,mn,mx,st,v]) =>
+    `<div class="sl"><label for="${id}"><span>${name}</span> <b id="${id}v"></b></label><input id="${id}" type="range" min="${mn}" max="${mx}" step="${st}" value="${v}"></div>`).join('');
+  $('sg').appendChild(d);
+});
+const fmt = Object.fromEntries(SL.flatMap(s => s.items.map(i => [i[0], i[6]])));
+Object.keys(fmt).forEach(id => $(id).addEventListener('input', () => { dirty = true; ui(); }));
+
+const modes = [['I','Time-averaged intensity'],['F','Instantaneous field (animated)']];
+modes.forEach(([m,txt]) => { const b = document.createElement('button'); b.textContent = txt; b.dataset.m = m;
+  b.onclick = () => { mode = m; dirty = true; ui(); }; $('modes').appendChild(b); });
+const play = document.createElement('button'); play.textContent = 'Pause';
+play.onclick = () => { playing = !playing; play.textContent = playing ? 'Pause' : 'Play'; }; $('modes').appendChild(play);
+
+const PRE = [['Symmetric, ±15°',{th1:15,ph1:0,th2:15,ph2:180,amp:45}],['One wave along z',{th1:0,ph1:0,th2:20,ph2:0,amp:45}],
+  ['Unequal amplitudes',{th1:15,ph1:0,th2:15,ph2:180,amp:25}],['Waves in different planes',{th1:20,ph1:0,th2:20,ph2:90,amp:45}]];
+PRE.forEach(([txt,v]) => { const b = document.createElement('button'); b.textContent = txt;
+  b.onclick = () => { Object.entries(v).forEach(([k,x]) => $(k).value = x); dirty = true; ui(); }; $('presets').appendChild(b); });
+
+// ---------- physics ----------
+const rad = id => +$(id).value*Math.PI/180;
+const dirv = (th,ph) => [Math.sin(th)*Math.cos(ph), Math.sin(th)*Math.sin(ph), Math.cos(th)];
+function params(){
+  const a = rad('amp'), lam = +$('lam').value;
+  return {A1:Math.cos(a), A2:Math.sin(a), lam, k:2*Math.PI/lam, d1:dirv(rad('th1'),rad('ph1')), d2:dirv(rad('th2'),rad('ph2'))};
+}
+// colour tables
+const lut = stops => { const o = new Uint8Array(256*3);
+  for (let i = 0; i < 256; i++){ const x = i/255; let j = 0; while (j < stops.length-2 && x > stops[j+1][0]) j++;
+    const [x0,a] = stops[j], [x1,b] = stops[j+1], f = Math.min(1,Math.max(0,(x-x0)/(x1-x0)));
+    for (let k = 0; k < 3; k++) o[i*3+k] = a[k] + f*(b[k]-a[k]); } return o; };
+const lutI = lut([[0,[8,8,30]],[0.5,[180,50,110]],[1,[255,230,150]]]);
+const lutF = lut([[0,[70,130,255]],[0.5,[24,24,30]],[1,[255,120,80]]]);
+
+function renderPattern(p){
+  const {A1,A2,k,d1,d2} = p, nrm = A1+A2, data = img.data, L = mode === 'I' ? lutI : lutF;
+  const kx1 = k*d1[0], ky1 = k*d1[1], kx2 = k*d2[0], ky2 = k*d2[1];
+  for (let j = 0; j < N; j++){
+    const y = LWIN/2 - (j+.5)/N*LWIN;
+    for (let i = 0; i < N; i++){
+      const x = (i+.5)/N*LWIN - LWIN/2, q1 = kx1*x+ky1*y, q2 = kx2*x+ky2*y;
+      const v = mode === 'I' ? (A1*A1+A2*A2+2*A1*A2*Math.cos(q1-q2))/(nrm*nrm)
+                              : 0.5 + 0.5*(A1*Math.cos(q1-t)+A2*Math.cos(q2-t))/nrm;
+      const idx = Math.min(255, Math.max(0, (v*255)|0))*3, o = (j*N+i)*4;
+      data[o] = L[idx]; data[o+1] = L[idx+1]; data[o+2] = L[idx+2]; data[o+3] = 255;
+    }
+  }
+  pctx.putImageData(img,0,0);
+}
+
+function ui(){
+  Object.keys(fmt).forEach(id => $(id+'v').textContent = fmt[id]($(id).value));
+  document.querySelectorAll('#modes button[data-m]').forEach(b => b.classList.toggle('on', b.dataset.m === mode));
+  $('ptitle').textContent = 'Interference pattern in the xy plane (' + (mode === 'I' ? 'time-averaged intensity' : 'instantaneous field') + ')';
+  updateTitle();
+  const p = params(), dx = p.d1[0]-p.d2[0], dy = p.d1[1]-p.d2[1], ds = Math.hypot(dx,dy);
+  const V = 2*p.A1*p.A2/(p.A1*p.A1+p.A2*p.A2);
+  let txt;
+  if (ds < 0.003) txt = 'No fringes in this plane: both waves have the same in-plane wave vector, so the intensity is uniform.';
+  else { let ang = (Math.atan2(dy,dx)*180/Math.PI + 90); ang = ((ang+90) % 180 + 180) % 180 - 90; if (ang === -90) ang = 90;
+    txt = `Fringe period Λ = λ / |Δ(sinθ)| = <strong>${(p.lam/ds).toFixed(2)} µm</strong>, fringes at <strong>${ang.toFixed(0)}°</strong> to the x axis`; }
+  $('state').innerHTML = txt + `. Fringe visibility 2A₁A₂/(A₁²+A₂²) = <strong>${(V*100).toFixed(0)}%</strong>.`;
+}
+
+// ---------- drawing ----------
+function line(c, pts, color, w, a = 1){
+  c.strokeStyle = color; c.lineWidth = w; c.globalAlpha = a; c.lineJoin = 'round'; c.lineCap = 'round'; c.beginPath();
+  pts.forEach((p,i) => i ? c.lineTo(p[0],p[1]) : c.moveTo(p[0],p[1])); c.stroke(); c.globalAlpha = 1;
+}
+function head(c, p0, p1, color, w){
+  line(c, [p0,p1], color, w);
+  const dx = p1[0]-p0[0], dy = p1[1]-p0[1], L = Math.hypot(dx,dy);
+  if (L < 3) return;
+  const h = Math.min(13, L*0.4), ux = dx/L, uy = dy/L;
+  c.fillStyle = color; c.beginPath(); c.moveTo(p1[0],p1[1]);
+  c.lineTo(p1[0]-h*ux+h*0.45*uy, p1[1]-h*uy-h*0.45*ux);
+  c.lineTo(p1[0]-h*ux-h*0.45*uy, p1[1]-h*uy+h*0.45*ux);
+  c.closePath(); c.fill();
+}
+function tag(c, txt, x, y){ c.lineWidth = 3; c.strokeStyle = 'rgba(0,0,0,.65)'; c.fillStyle = '#fff'; c.strokeText(txt,x,y); c.fillText(txt,x,y); }
+
+function axisArrow(c, p0, p1){
+  line(c,[p0,p1],'rgba(0,0,0,.65)',4); line(c,[p0,p1],'#fff',1.6);
+  const dx = p1[0]-p0[0], dy = p1[1]-p0[1], L = Math.hypot(dx,dy), ux = dx/L, uy = dy/L, h = 11;
+  c.beginPath(); c.moveTo(p1[0],p1[1]); c.lineTo(p1[0]-h*ux+h*.45*uy, p1[1]-h*uy-h*.45*ux); c.lineTo(p1[0]-h*ux-h*.45*uy, p1[1]-h*uy+h*.45*ux); c.closePath();
+  c.fillStyle = '#fff'; c.strokeStyle = 'rgba(0,0,0,.65)'; c.lineWidth = 1.5; c.fill(); c.stroke();
+}
+function drawPattern(){
+  const W = cvp.clientWidth, H = cvp.clientHeight, m = W*MG, S = W-2*m, cx = W/2, cy = H/2, reach = S/2 + 0.8*m;
+  cp.imageSmoothingEnabled = true; cp.clearRect(0,0,W,H); cp.drawImage(pat,m,m,S,S);
+  cp.font = '13px system-ui,sans-serif';
+  // axes through the centre, extending beyond the image
+  axisArrow(cp,[cx,cy],[cx+reach,cy]); axisArrow(cp,[cx,cy],[cx,cy-reach]);
+  cp.fillStyle = colr('--text'); cp.fillText('x',cx+reach-8,cy+20); cp.fillText('y',cx+12,cy-reach+14);
+  const bw = 2/LWIN*S; line(cp,[[m+14,m+S-22],[m+14+bw,m+S-22]],'#fff',3); tag(cp,'2 µm',m+14,m+S-28);
+  drawLineOverlay(cp,W,H);
+}
+
+
+// ---------- line A-B on the screen view, and the 1D profile ----------
+function drawLineOverlay(c, W, H){
+  const m = W*MG, S = W-2*m;
+  const a = [m+(LA[0]+LWIN/2)/LWIN*S, m+(LWIN/2-LA[1])/LWIN*S], b = [m+(LB[0]+LWIN/2)/LWIN*S, m+(LWIN/2-LB[1])/LWIN*S];
+  line(c,[a,b],'rgba(0,0,0,.7)',5); line(c,[a,b],'#fff',2);
+  [[a,'A'],[b,'B']].forEach(([q,n]) => { c.fillStyle = '#fff'; c.strokeStyle = 'rgba(0,0,0,.8)'; c.lineWidth = 2;
+    c.beginPath(); c.arc(q[0],q[1],7,0,7); c.fill(); c.stroke(); tag(c,n,q[0]+10,q[1]-10); });
+}
+let ang = 0; const HL = 4.5;                      // the line A-B always passes through the centre; HL = half-length in µm
+const wrap = a => Math.atan2(Math.sin(a), Math.cos(a));
+function updateTitle(){
+  $('ltitle').textContent = (mode === 'I' ? 'Intensity' : 'Field (instantaneous)') + ` along the line A → B, at ${(wrap(ang)*180/Math.PI).toFixed(0)}° to the x axis`;
+}
+function setAng(a){ ang = wrap(a); LA = [-HL*Math.cos(ang), -HL*Math.sin(ang)]; LB = [HL*Math.cos(ang), HL*Math.sin(ang)]; updateTitle(); }
+const segDist = (m,a,b) => { const dx = b[0]-a[0], dy = b[1]-a[1], l2 = dx*dx+dy*dy || 1e-9;
+  const u = Math.max(0, Math.min(1, ((m[0]-a[0])*dx+(m[1]-a[1])*dy)/l2)); return Math.hypot(m[0]-a[0]-u*dx, m[1]-a[1]-u*dy); };
+const toWin = e => { const r = cvp.getBoundingClientRect(); const f = 1-2*MG; return [((e.clientX-r.left)/r.width-MG)/f*LWIN-LWIN/2, LWIN/2-((e.clientY-r.top)/r.height-MG)/f*LWIN]; };
+function hit(e){
+  const m = toWin(e), k = cvp.getBoundingClientRect().width*(1-2*MG)/LWIN;
+  const dA = Math.hypot(m[0]-LA[0],m[1]-LA[1])*k, dB = Math.hypot(m[0]-LB[0],m[1]-LB[1])*k;
+  if (dA < 16 && dA <= dB) return 'A';
+  if (dB < 16) return 'B';
+  return segDist(m,LA,LB)*k < 10 ? 'L' : null;
+}
+cvp.addEventListener('pointerdown', e => { drag = hit(e); if (drag){ cvp.setPointerCapture(e.pointerId); e.preventDefault(); } });
+cvp.addEventListener('pointermove', e => {
+  if (!drag){ cvp.style.cursor = hit(e) ? 'grab' : 'default'; return; }
+  const m = toWin(e); if (Math.hypot(m[0],m[1]) < 0.3) return;
+  const raw = Math.atan2(m[1],m[0]);
+  if (drag === 'B') setAng(raw);
+  else if (drag === 'A') setAng(raw+Math.PI);
+  else setAng(Math.abs(wrap(raw-ang)) <= Math.PI/2 ? raw : raw+Math.PI);
+});
+['pointerup','pointercancel'].forEach(ev => cvp.addEventListener(ev, () => { drag = null; }));
+
+function niceStep(r){ const e = Math.pow(10, Math.floor(Math.log10(r))), f = r/e; return (f < 1.5 ? 1 : f < 3.5 ? 2 : f < 7.5 ? 5 : 10)*e; }
+function drawProfile(p){
+  const c = cl, W = cvl.clientWidth, H = cvl.clientHeight; c.clearRect(0,0,W,H);
+  const ml = 46, mr = 14, mt = 10, mb = 34, pw = W-ml-mr, ph = H-mt-mb;
+  const muted = colr('--muted'), grid = colr('--grid'), green = colr('--cs'), lo = mode === 'I' ? 0 : -1;
+  const Y = v => mt + ph*(1-(v-lo)/(1-lo)), n = 400;
+  c.font = '12px system-ui,sans-serif'; c.fillStyle = muted; c.textAlign = 'right';
+  (mode === 'I' ? [0,0.5,1] : [-1,0,1]).forEach(v => { line(c,[[ml,Y(v)],[ml+pw,Y(v)]],grid,1); c.fillText(String(v),ml-6,Y(v)+4); });
+  const {A1,A2,k,d1,d2} = p, nrm = A1+A2, pts = [];
+  for (let i = 0; i <= n; i++){
+    const u = i/n, x = LA[0]+u*(LB[0]-LA[0]), y = LA[1]+u*(LB[1]-LA[1]);
+    const q1 = k*(d1[0]*x+d1[1]*y), q2 = k*(d2[0]*x+d2[1]*y);
+    const v = mode === 'I' ? (A1*A1+A2*A2+2*A1*A2*Math.cos(q1-q2))/(nrm*nrm) : (A1*Math.cos(q1-t)+A2*Math.cos(q2-t))/nrm;
+    pts.push([ml+pw*u, Y(v)]);
+  }
+  if (mode === 'I'){ c.fillStyle = green; c.globalAlpha = 0.15; c.beginPath(); c.moveTo(ml,Y(0));
+    pts.forEach(q => c.lineTo(q[0],q[1])); c.lineTo(ml+pw,Y(0)); c.closePath(); c.fill(); c.globalAlpha = 1; }
+  line(c,pts,green,2);
+  const len = Math.hypot(LB[0]-LA[0],LB[1]-LA[1]);
+  c.fillStyle = muted; c.textAlign = 'center';
+  if (len > 0.02){ const st = niceStep(len/5);
+    for (let v = 0; v <= len+1e-9; v += st){ const x = ml+pw*v/len; line(c,[[x,mt+ph],[x,mt+ph+4]],muted,1); c.fillText(String(+v.toFixed(2)),x,mt+ph+16); } }
+  c.fillText('distance along the line A → B (µm)', ml+pw/2, H-4);
+  c.textAlign = 'left'; c.fillText('A', ml+4, mt+12); c.textAlign = 'right'; c.fillText('B', ml+pw-4, mt+12); c.textAlign = 'left';
+}
+
+function draw3d(p){
+  const c = c3, W = cv3.clientWidth, H = cv3.clientHeight;
+  c.clearRect(0,0,W,H);
+  const Ls = 1.8, E = 1.5, zp = 4.2, sq2 = Math.SQRT2, sq6 = Math.sqrt(6);
+  // isometric projection, right-handed: x lower right, y up, z (towards the viewer) upper right
+  const raw = (x,y,z) => [(x+z)/sq2, (-x+2*y+z)/sq6];
+  const keys = [[0,0,0],[1.4,0,0],[0,1.4,0],[0,0,zp+1.2]];
+  for (const a of [-1,1]) for (const b of [-1,1]) keys.push([a*1.9,b*1.9,zp],[a*1.9,b*1.9,zp-Ls]);
+  const kp = keys.map(k => raw(...k));
+  const x0 = Math.min(...kp.map(k=>k[0])), x1 = Math.max(...kp.map(k=>k[0]));
+  const y0 = Math.min(...kp.map(k=>k[1])), y1 = Math.max(...kp.map(k=>k[1]));
+  const aw = W-60, ah = H-40, s = Math.min(aw/(x1-x0), ah/(y1-y0));
+  const ox = 14 + (aw-s*(x1-x0))/2, oy = 14 + (ah-s*(y1-y0))/2;
+  const P = (x,y,z) => { const q = raw(x,y,z); return [ox + s*(q[0]-x0), oy + s*(y1-q[1])]; };
+  const muted = colr('--muted'), col = [colr('--c1'), colr('--c2')];
+  c.font = '13px system-ui,sans-serif'; c.fillStyle = muted;
+
+  // axes at the origin; the z axis runs through the centre of the plane
+  const O = P(0,0,0), C = P(0,0,zp);
+  line(c,[O,P(1.3,0,0)],muted,1.2); line(c,[O,P(0,1.3,0)],muted,1.2);
+  c.setLineDash([4,4]); line(c,[O,C],muted,1,0.7); c.setLineDash([]);
+  let q = P(1.3,0,0); c.fillText('x',q[0]+6,q[1]+4); q = P(0,1.3,0); c.fillText('y',q[0]+6,q[1]+4);
+
+  // the xy plane carrying the interference pattern
+  const TL = P(-E,E,zp), TR = P(E,E,zp), BL = P(-E,-E,zp), BR = P(E,-E,zp);
+  c.save(); c.imageSmoothingEnabled = true;
+  c.transform((TR[0]-TL[0])/N,(TR[1]-TL[1])/N,(BL[0]-TL[0])/N,(BL[1]-TL[1])/N,TL[0],TL[1]);
+  c.drawImage(pat,0,0); c.restore();
+  line(c,[TL,TR,BR,BL,TL],muted,1.2,0.9);
+  // x and y axes of the plane, drawn along the same directions as the axes at the origin
+  line(c,[P(-E,0,zp),P(E,0,zp)],'#fff',1.2,0.6); line(c,[P(0,-E,zp),P(0,E,zp)],'#fff',1.2,0.6);
+  line(c,[P(E,0,zp),P(E+0.3,0,zp)],muted,1.2); line(c,[P(0,E,zp),P(0,E+0.3,zp)],muted,1.2);
+  c.fillStyle = muted; q = P(E+0.3,0,zp); c.fillText('x',q[0]+6,q[1]+4); q = P(0,E+0.3,zp); c.fillText('y',q[0]+6,q[1]+4);
+  q = P(E,-E,zp); c.fillText('xy plane',q[0]-24,q[1]+18);
+  // the line A-B chosen in the screen view, drawn on the plane
+  const WP = a => P(a[0]/(LWIN/2)*E, a[1]/(LWIN/2)*E, zp), pa = WP(LA), pb = WP(LB);
+  line(c,[pa,pb],'rgba(0,0,0,.7)',4); line(c,[pa,pb],'#fff',1.8);
+  [[pa,'A'],[pb,'B']].forEach(([q,n]) => { c.fillStyle = '#fff'; c.strokeStyle = 'rgba(0,0,0,.8)'; c.lineWidth = 1.5; c.beginPath(); c.arc(q[0],q[1],4.5,0,7); c.fill(); c.stroke(); tag(c,n,q[0]+7,q[1]-7); });
+  // continuation of the z axis beyond the plane
+  head(c,C,P(0,0,zp+1.1),muted,1.5); q = P(0,0,zp+1.1); c.fillText('z',q[0]+8,q[1]+4);
+
+  // wave vectors: both end at the centre of the plane; dashed lines show their projection on the plane
+  [p.d1, p.d2].forEach((d,i) => {
+    const tail = P(-Ls*d[0],-Ls*d[1],zp-Ls*d[2]), pr = P(-Ls*d[0],-Ls*d[1],zp);
+    c.setLineDash([3,4]); line(c,[tail,pr],col[i],1.3,0.7); line(c,[pr,C],col[i],1.3,0.7); c.setLineDash([]);
+    head(c,tail,C,col[i],4);
+    c.fillStyle = col[i]; c.fillText('k'+(i ? '\u2082' : '\u2081'), tail[0]-24, tail[1]+4+i*14);
+  });
+  c.fillStyle = '#fff'; c.strokeStyle = muted; c.lineWidth = 1.2; c.beginPath(); c.arc(C[0],C[1],3.5,0,7); c.fill(); c.stroke();
+}
+
+function resize(){
+  const dpr = window.devicePixelRatio || 1;
+  [[cv3,c3],[cvp,cp],[cvl,cl]].forEach(([c,x]) => { const r = c.getBoundingClientRect();
+    c.width = Math.round(r.width*dpr); c.height = Math.round(r.height*dpr); x.setTransform(dpr,0,0,dpr,0,0); });
+}
+addEventListener('resize', resize);
+
+function frame(now){
+  const dt = Math.min(0.05,(now-last)/1000); last = now;
+  if (playing && mode === 'F') t += dt*2*Math.PI*0.25;
+  const p = params();
+  if (dirty || mode === 'F'){ renderPattern(p); dirty = false; }
+  drawPattern(); drawProfile(p); draw3d(p);
+  requestAnimationFrame(frame);
+}
+resize(); ui(); requestAnimationFrame(frame);
+</script>
+</body>
+</html>

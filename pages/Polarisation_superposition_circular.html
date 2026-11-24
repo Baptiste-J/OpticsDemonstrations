@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Polarisation: superposition of right and left circular components</title>
+<style>
+:root{
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+  --bg:#f7f7f5;--panel:#ffffff;--text:#1d1d1f;--muted:#6b6b70;--grid:#d9d9d4;--border:#e2e2dc;
+  --cx:#2563eb;--cy:#dc2626;--cs:#059669;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){--bg:#17181a;--panel:#212326;--text:#ececec;--muted:#9a9aa0;--grid:#3a3c40;--border:#34363a;--cx:#6ea0ff;--cy:#ff7b7b;--cs:#34d399;color-scheme:dark}
+}
+:root[data-theme="dark"]{--bg:#17181a;--panel:#212326;--text:#ececec;--muted:#9a9aa0;--grid:#3a3c40;--border:#34363a;--cx:#6ea0ff;--cy:#ff7b7b;--cs:#34d399;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:1180px;margin:0 auto;padding:16px}
+h1{font-size:1.35rem;margin:.2em 0 .6em}
+h2{font-size:1rem;margin:0 0 8px;color:var(--muted);font-weight:600}
+p.sub{margin:0;color:var(--muted);font-size:.82rem}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:12px}
+canvas{display:block;width:100%;margin:0 auto}
+#cv{aspect-ratio:1/1}
+#cv3{aspect-ratio:3/2}
+.views{display:grid;grid-template-columns:1fr 1.5fr;gap:16px;align-items:start}
+@media (max-width:760px){.views{grid-template-columns:1fr}}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:.88rem;margin:8px 0 0}
+.legend span::before{content:"";display:inline-block;width:18px;height:4px;border-radius:2px;margin-right:6px;vertical-align:middle;background:currentColor}
+.controls{display:grid;gap:14px;margin-top:16px}
+label{display:flex;justify-content:space-between;font-size:.95rem;margin-bottom:2px}
+label b{font-variant-numeric:tabular-nums}
+input[type=range]{width:100%}
+.state{font-size:1rem}
+.state strong{color:var(--cs)}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+button{background:var(--panel);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:6px 12px;font:inherit;font-size:.9rem;cursor:pointer}
+button:hover{border-color:var(--muted)}
+.back{display:inline-block;margin:0 0 6px;font-size:.9rem;color:var(--muted);text-decoration:none}
+.back:hover{color:var(--cs);text-decoration:underline}
+</style>
+</head>
+<body>
+<main>
+  <a class="back" href="../index.html">← Back to the menu</a>
+  <h1>Superposition of right and left circular polarisations</h1>
+
+  <div class="views">
+    <div class="card">
+      <h2>At a fixed point: the field seen head-on</h2>
+      <canvas id="cv"></canvas>
+      <div class="legend">
+        <span style="color:var(--cx)">Right circular (clockwise)</span>
+        <span style="color:var(--cy)">Left circular (anticlockwise)</span>
+        <span style="color:var(--cs)">Sum</span>
+      </div>
+      <p class="sub" style="margin-top:8px">Handedness as seen by an observer looking towards the source. The dashed parallelogram shows the vector addition.</p>
+    </div>
+    <div class="card">
+      <h2>Along the propagation direction: the wave in space and time</h2>
+      <canvas id="cv3"></canvas>
+      <div class="legend">
+        <span style="color:var(--cx)">Right circular (at z = 0)</span>
+        <span style="color:var(--cy)">Left circular (at z = 0)</span>
+        <span style="color:var(--cs)">Total field E(z,t)</span>
+      </div>
+      <p class="sub" style="margin-top:8px">The wave leaves the xy plane at z = 0 and travels in the +z direction.</p>
+    </div>
+  </div>
+
+  <div class="card controls">
+    <div>
+      <label for="amp"><span>Relative amplitude, A<sub>L</sub> / A<sub>R</sub></span> <b id="ampv"></b></label>
+      <input id="amp" type="range" min="0" max="90" step="1" value="45">
+      <p class="sub" id="ampn"></p>
+    </div>
+    <div>
+      <label for="ph"><span>Relative phase, δ (left relative to right)</span> <b id="phv"></b></label>
+      <input id="ph" type="range" min="-180" max="180" step="1" value="60">
+    </div>
+    <div>
+      <label for="sp"><span>Animation speed</span> <b id="spv"></b></label>
+      <input id="sp" type="range" min="0.1" max="2" step="0.1" value="0.5">
+    </div>
+    <div class="row">
+      <button id="play">Pause</button>
+      <button data-a="45" data-p="0">Equal, δ = 0</button>
+      <button data-a="45" data-p="90">Equal, δ = 90°</button>
+      <button data-a="35" data-p="60">Unequal (elliptical)</button>
+      <button data-a="0" data-p="0">Right only</button>
+      <button data-a="90" data-p="0">Left only</button>
+    </div>
+    <div class="state" id="state"></div>
+  </div>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const cv = $('cv'), ctx = cv.getContext('2d'), cv3 = $('cv3'), ctx3 = cv3.getContext('2d');
+let playing = true, t = 0, last = performance.now();
+const colr = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+// Right circular: AR (cos φ, -sin φ), clockwise on screen. Left circular: AL (cos(φ+δ), sin(φ+δ)), anticlockwise.
+// Their sum is an ellipse with semi-axes AR+AL and |AR-AL|, major axis at angle δ/2 to the x axis.
+function params(){
+  const a = +$('amp').value*Math.PI/180, d = +$('ph').value*Math.PI/180;
+  return {AR: Math.cos(a), AL: Math.sin(a), d};
+}
+const field = (p, ph) => [p.AR*Math.cos(ph) + p.AL*Math.cos(ph+p.d), -p.AR*Math.sin(ph) + p.AL*Math.sin(ph+p.d)];
+
+function classify({AR, AL, d}){
+  const e = 0.01, th = d*90/Math.PI;
+  if (AL < e) return 'Right circular polarisation (clockwise on screen)';
+  if (AR < e) return 'Left circular polarisation (anticlockwise on screen)';
+  if (Math.abs(AR-AL) < e) return `Linear polarisation at ${th.toFixed(0)}° to the horizontal (= δ/2)`;
+  return `Elliptical polarisation, major axis at ${th.toFixed(0)}° (= δ/2), ${AR > AL ? 'clockwise' : 'anticlockwise'} on screen`;
+}
+
+function resize(){
+  const dpr = window.devicePixelRatio || 1;
+  [[cv,ctx],[cv3,ctx3]].forEach(([c,x]) => {
+    const r = c.getBoundingClientRect();
+    c.width = Math.round(r.width*dpr); c.height = Math.round(r.height*dpr);
+    x.setTransform(dpr,0,0,dpr,0,0);
+  });
+}
+addEventListener('resize', resize);
+
+function line(c, pts, color, w, a = 1){
+  c.strokeStyle = color; c.lineWidth = w; c.globalAlpha = a; c.lineJoin = 'round'; c.lineCap = 'round'; c.beginPath();
+  pts.forEach((p,i) => i ? c.lineTo(p[0],p[1]) : c.moveTo(p[0],p[1])); c.stroke(); c.globalAlpha = 1;
+}
+function head(c, p0, p1, color, w){
+  line(c, [p0,p1], color, w);
+  const dx = p1[0]-p0[0], dy = p1[1]-p0[1], L = Math.hypot(dx,dy);
+  if (L < 3) return;
+  const h = Math.min(13, L*0.4), ux = dx/L, uy = dy/L;
+  c.fillStyle = color; c.beginPath(); c.moveTo(p1[0],p1[1]);
+  c.lineTo(p1[0]-h*ux+h*0.45*uy, p1[1]-h*uy-h*0.45*ux);
+  c.lineTo(p1[0]-h*ux-h*0.45*uy, p1[1]-h*uy+h*0.45*ux);
+  c.closePath(); c.fill();
+}
+
+function draw(){
+  const c = ctx, W = cv.clientWidth, H = cv.clientHeight, cx = W/2, cy = H/2, L = Math.min(W,H)*0.44, R = L/1.5;
+  const p = params(), {AR, AL, d} = p;
+  c.clearRect(0,0,W,H);
+  line(c, [[cx-L,cy],[cx+L,cy]], colr('--grid'), 1); line(c, [[cx,cy-L],[cx,cy+L]], colr('--grid'), 1);
+  const X = (v) => [cx + R*v[0], cy - R*v[1]];
+
+  // circles traced by each component, and the ellipse traced by the sum
+  c.setLineDash([4,4]); c.lineWidth = 1;
+  [[AR,'--cx'],[AL,'--cy']].forEach(([a,k]) => { c.strokeStyle = colr(k); c.globalAlpha = 0.45; c.beginPath(); c.arc(cx,cy,R*a,0,7); c.stroke(); });
+  c.globalAlpha = 0.6; c.strokeStyle = colr('--cs'); c.beginPath();
+  for (let i = 0; i <= 120; i++){ const q = X(field(p, i/120*2*Math.PI)); i ? c.lineTo(q[0],q[1]) : c.moveTo(q[0],q[1]); }
+  c.stroke(); c.setLineDash([]); c.globalAlpha = 1;
+
+  // fading trail of the sum tip
+  const N = 100;
+  for (let k = N; k > 0; k--)
+    line(c, [X(field(p, t - k*2*Math.PI/N)), X(field(p, t - (k-1)*2*Math.PI/N))], colr('--cs'), 2.5, 0.7*(1-k/N));
+
+  const vr = [AR*Math.cos(t), -AR*Math.sin(t)], vl = [AL*Math.cos(t+d), AL*Math.sin(t+d)];
+  const s = [vr[0]+vl[0], vr[1]+vl[1]], o = [cx,cy], pr = X(vr), pl = X(vl), ps = X(s);
+  c.setLineDash([3,4]); line(c, [pr,ps], colr('--cy'), 1.5, 0.7); line(c, [pl,ps], colr('--cx'), 1.5, 0.7); c.setLineDash([]);
+  head(c, o, pr, colr('--cx'), 4);
+  head(c, o, pl, colr('--cy'), 4);
+  head(c, o, ps, colr('--cs'), 4);
+  c.fillStyle = colr('--cs'); c.beginPath(); c.arc(ps[0],ps[1],4,0,7); c.fill();
+  c.fillStyle = colr('--muted'); c.font = '13px system-ui,sans-serif';
+  c.fillText('x', cx+L-10, cy-8); c.fillText('y', cx+8, cy-L+12);
+}
+
+// Isometric 3D view, right-handed axes: x lower right, y up, z (propagation) upper right.
+function draw3d(){
+  const c = ctx3, W = cv3.clientWidth, H = cv3.clientHeight, p = params(), {AR, AL, d} = p;
+  c.clearRect(0,0,W,H);
+  const zMax = 2.5, ZW = 1.6, E = 1.6, nn = Math.sqrt(3), cd = [-1/nn,-1/nn,1/nn];
+  const rn = Math.hypot(cd[2],cd[0]), r = [cd[2]/rn,0,-cd[0]/rn];
+  const u = [cd[1]*r[2]-cd[2]*r[1], cd[2]*r[0]-cd[0]*r[2], cd[0]*r[1]-cd[1]*r[0]], T = zMax*ZW/2;
+  const raw = (x,y,z) => { const q = [x,y,z*ZW-T]; return [q[0]*r[0]+q[1]*r[1]+q[2]*r[2], q[0]*u[0]+q[1]*u[1]+q[2]*u[2]]; };
+  const keys = [[-1,-1],[1,-1],[1,1],[-1,1]].flatMap(k => [raw(k[0]*(E+.1),k[1]*(E+.1),0), raw(k[0]*1.5,k[1]*1.5,zMax+.15)]);
+  const x0 = Math.min(...keys.map(k=>k[0])), x1 = Math.max(...keys.map(k=>k[0]));
+  const y0 = Math.min(...keys.map(k=>k[1])), y1 = Math.max(...keys.map(k=>k[1]));
+  const aw = W-70, ah = H-40, s = Math.min(aw/(x1-x0), ah/(y1-y0));
+  const offx = 14 + (aw-s*(x1-x0))/2, offy = 14 + (ah-s*(y1-y0))/2;
+  const P = (x,y,z) => { const q = raw(x,y,z); return [offx + s*(q[0]-x0), offy + s*(y1-q[1])]; };
+  const muted = colr('--muted'), grid = colr('--grid'), green = colr('--cs');
+  c.font = '13px system-ui,sans-serif';
+
+  // xy plane at z = 0
+  const cn = [P(-E,-E,0), P(E,-E,0), P(E,E,0), P(-E,E,0), P(-E,-E,0)];
+  c.fillStyle = grid; c.globalAlpha = 0.25; c.beginPath(); cn.forEach((q,i) => i ? c.lineTo(q[0],q[1]) : c.moveTo(q[0],q[1])); c.fill(); c.globalAlpha = 1;
+  for (const g of [-1.5,-1,-0.5,0.5,1,1.5]){ line(c,[P(g,-E,0),P(g,E,0)],grid,1,0.6); line(c,[P(-E,g,0),P(E,g,0)],grid,1,0.6); }
+  c.setLineDash([4,4]); line(c, cn, muted, 1, 0.7); c.setLineDash([]);
+  line(c,[P(-E,0,0),P(E,0,0)],muted,1,0.8); line(c,[P(0,-E,0),P(0,E,0)],muted,1,0.8);
+  c.fillStyle = muted;
+  let q = P(E,0,0); c.fillText('x', q[0]+6, q[1]+4);
+  q = P(0,E,0); c.fillText('y', q[0]+6, q[1]+4);
+  q = P(-E,-E,0); c.fillText('z = 0', q[0], q[1]+16);
+
+  head(c, P(0,0,0), P(0,0,zMax+0.15), muted, 1.5);
+  q = P(0,0,zMax+0.15); c.fillText('z (propagation)', q[0]-40, q[1]+18);
+
+  // total field along z at this instant
+  const M = 200, zs = Array.from({length:M+1}, (_,i) => i*zMax/M);
+  const tips = zs.map(z => { const f = field(p, t - 2*Math.PI*z); return P(f[0], f[1], z); });
+  c.strokeStyle = green; c.globalAlpha = 0.3; c.lineWidth = 1;
+  zs.forEach((z,i) => { if (i % 3) return; const o = P(0,0,z); c.beginPath(); c.moveTo(o[0],o[1]); c.lineTo(tips[i][0],tips[i][1]); c.stroke(); });
+  c.globalAlpha = 1;
+  line(c, tips, green, 2.5);
+
+  // the two circular components and their sum in the z = 0 plane
+  const vr = [AR*Math.cos(t), -AR*Math.sin(t)], vl = [AL*Math.cos(t+d), AL*Math.sin(t+d)];
+  const o = P(0,0,0), pr = P(vr[0],vr[1],0), pl = P(vl[0],vl[1],0), ps = P(vr[0]+vl[0], vr[1]+vl[1], 0);
+  c.setLineDash([3,4]); line(c,[pr,ps],colr('--cy'),1.5,0.7); line(c,[pl,ps],colr('--cx'),1.5,0.7); c.setLineDash([]);
+  head(c, o, pr, colr('--cx'), 4); head(c, o, pl, colr('--cy'), 4); head(c, o, ps, green, 4);
+}
+
+function ui(){
+  const p = params(), ratio = p.AL/Math.max(p.AR,1e-9);
+  $('ampv').textContent = ratio > 99 ? '∞' : ratio.toFixed(2);
+  $('ampn').textContent = `A\u1D3F = ${p.AR.toFixed(2)}, A\u1D38 = ${p.AL.toFixed(2)} (A\u1D3F² + A\u1D38² = 1)`;
+  $('phv').textContent = `${$('ph').value}°`;
+  $('spv').textContent = `${(+$('sp').value).toFixed(1)}×`;
+  $('state').innerHTML = `Resulting state: <strong>${classify(p)}</strong>`;
+}
+
+function frame(now){
+  const dt = Math.min(0.05, (now-last)/1000); last = now;
+  if (playing) t += dt*2*Math.PI*+$('sp').value;
+  draw(); draw3d(); requestAnimationFrame(frame);
+}
+
+['amp','ph','sp'].forEach(id => $(id).addEventListener('input', ui));
+$('play').onclick = () => { playing = !playing; $('play').textContent = playing ? 'Pause' : 'Play'; };
+document.querySelectorAll('button[data-a]').forEach(b => b.onclick = () => { $('amp').value = b.dataset.a; $('ph').value = b.dataset.p; ui(); });
+
+resize(); ui(); requestAnimationFrame(frame);
+</script>
+</body>
+</html>

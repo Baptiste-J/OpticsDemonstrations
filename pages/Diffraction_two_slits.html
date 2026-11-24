@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Diffraction by two slits</title>
+<style>
+:root{
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+  --bg:#f7f7f5;--panel:#ffffff;--text:#1d1d1f;--muted:#6b6b70;--grid:#d9d9d4;--border:#e2e2dc;--cs:#059669;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){--bg:#17181a;--panel:#212326;--text:#ececec;--muted:#9a9aa0;--grid:#3a3c40;--border:#34363a;--cs:#34d399;color-scheme:dark}
+}
+:root[data-theme="dark"]{--bg:#17181a;--panel:#212326;--text:#ececec;--muted:#9a9aa0;--grid:#3a3c40;--border:#34363a;--cs:#34d399;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:1500px;margin:0 auto;padding:16px}
+h1{font-size:1.35rem;margin:.2em 0 .6em}
+h2{font-size:1rem;margin:0 0 8px;color:var(--muted);font-weight:600}
+p.sub{margin:0;color:var(--muted);font-size:.82rem}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:12px}
+canvas{display:block;width:100%;aspect-ratio:1/1}
+/* size the screen view and the profile so that both fit in the window height */
+.pcard{--pw:min(100%,max(280px,calc((100vh - 260px) / 1.36)))}
+#cvp,#cvl{width:var(--pw);margin-left:auto;margin-right:auto}
+#cvl{aspect-ratio:2.8/1}
+.views{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) 310px;gap:16px;align-items:start}
+@media (max-width:1100px){.views{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.controls{grid-column:1 / -1;position:static !important;max-height:none !important}}
+@media (max-width:760px){.views{grid-template-columns:minmax(0,1fr)}}
+.controls{display:grid;gap:10px;position:sticky;top:12px;max-height:calc(100vh - 24px);overflow-y:auto}
+.sl{margin-bottom:6px}
+label{display:flex;justify-content:space-between;font-size:.92rem;margin-bottom:2px}
+label b{font-variant-numeric:tabular-nums}
+input[type=range]{width:100%}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+button{background:var(--panel);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:4px 10px;font:inherit;font-size:.85rem;cursor:pointer}
+button:hover{border-color:var(--muted)}
+button.on{border-color:var(--cs);color:var(--cs)}
+.state{font-size:.95rem}
+.state strong{color:var(--cs)}
+.back{display:inline-block;margin:0 0 6px;font-size:.9rem;color:var(--muted);text-decoration:none}
+.back:hover{color:var(--cs);text-decoration:underline}
+</style>
+</head>
+<body>
+<main>
+  <a class="back" href="../index.html">← Back to the menu</a>
+  <h1>Diffraction by two slits</h1>
+
+  <div class="views">
+    <div class="card">
+      <h2>Geometry: the two slits and the observation screen</h2>
+      <canvas id="cv3"></canvas>
+      <p class="sub" style="margin-top:8px">Light travels along +z, passes through the two slits and forms the pattern on the screen. The slits are long along y, so the pattern varies only along x.</p>
+    </div>
+
+    <div class="card pcard">
+      <h2>Interference and diffraction pattern on the screen</h2>
+      <canvas id="cvp"></canvas>
+      <h2 id="ltitle" style="margin:14px 0 4px">Intensity along the x axis</h2>
+      <canvas id="cvl"></canvas>
+      <p class="sub" style="margin-top:8px">The square is 40 mm × 40 mm. The slit-to-screen distance is fixed at L = 1 m (far-field regime). Intensity is normalised to the central maximum. The dashed curve is the single-slit diffraction envelope.</p>
+    </div>
+
+    <div class="card controls">
+      <div>
+        <div class="sl"><label for="sw"><span>Slit width, a</span> <b id="swv"></b></label><input id="sw" type="range" min="10" max="100" step="1" value="30"></div>
+        <div class="sl"><label for="dd"><span>Distance between the slits, d</span> <b id="ddv"></b></label><input id="dd" type="range" min="30" max="400" step="1" value="120"></div>
+        <div class="sl"><label for="lam"><span>Wavelength, λ</span> <b id="lamv"></b></label><input id="lam" type="range" min="400" max="750" step="5" value="550"></div>
+        <div class="sl"><label for="mx"><span>Display maximum (fraction of peak)</span> <b id="mxv"></b></label><input id="mx" type="range" min="0" max="3" step="0.05" value="3">
+          <p class="sub">Lowering it saturates the central peak so the secondary lobes become visible (screen view and plot).</p></div>
+      </div>
+      <div class="row" id="scales"></div>
+      <div class="row" id="presets"></div>
+      <div class="state" id="state"></div>
+    </div>
+  </div>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const cv3 = $('cv3'), c3 = cv3.getContext('2d'), cvp = $('cvp'), cp = cvp.getContext('2d'), cvl = $('cvl'), cl = cvl.getContext('2d');
+const colr = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const N = 280, XW = 40, L_M = 1, MG = 0.075;       // pattern resolution, screen window (mm), distance (m), image margin
+const pat = document.createElement('canvas'); pat.width = pat.height = N;
+const pctx = pat.getContext('2d'), img = pctx.createImageData(N,N);
+let scale = 'lin', dirty = true;
+
+// ---------- physics ----------
+// Fraunhofer double slit: I(x) / I0 = sinc²(π a x / (λ L)) · cos²(π d x / (λ L))
+// fringe spacing λ L / d, envelope minima at x = n λ L / a
+const sinc2 = u => Math.abs(u) < 1e-8 ? 1 : Math.pow(Math.sin(u)/u, 2);
+const envelope = (x, a, lam) => sinc2(Math.PI*a*x/(lam*L_M));                      // a in µm, x in mm, λ in nm, L in m
+const intensity = (x, a, lam, d) => envelope(x, a, lam)*Math.pow(Math.cos(Math.PI*d*x/(lam*L_M)), 2);
+const par = () => { const a = +$('sw').value; return {a, d: Math.max(+$('dd').value, a), lam: +$('lam').value}; };
+// display range: linear mode shows 0 ... m, logarithmic mode shows m·10⁻⁴ ... m (m = display maximum, fraction of the peak)
+const dmax = () => Math.pow(10, +$('mx').value - 3);   // slider 0...3  ->  0.1 % ... 100 % of the peak
+const disp = (I, m) => scale === 'lin' ? Math.min(1, I/m) : Math.min(1, Math.max(0, (Math.log10(Math.max(I/m,1e-12))+4)/4));
+const sup = n => String(n).split('').map(d => '⁰¹²³⁴⁵⁶⁷⁸⁹'[d]).join('');
+function fmtTick(v){
+  if (v >= 0.01 && v <= 1) return String(+v.toPrecision(2));
+  const e = Math.floor(Math.log10(v)+1e-9), mt = v/Math.pow(10,e);
+  return (Math.abs(mt-1) < 0.05 ? '' : Math.round(mt)+'×') + '10' + (e < 0 ? '⁻' : '') + sup(Math.abs(e));
+}
+function wl2rgb(w){
+  let r = 0, g = 0, b = 0;
+  if (w < 440){ r = (440-w)/60; b = 1; } else if (w < 490){ g = (w-440)/50; b = 1; } else if (w < 510){ g = 1; b = (510-w)/20; }
+  else if (w < 580){ r = (w-510)/70; g = 1; } else if (w < 645){ r = 1; g = (645-w)/65; } else r = 1;
+  const f = w < 420 ? 0.3+0.7*(w-400)/20 : w > 700 ? 0.3+0.7*(750-w)/50 : 1;
+  return [r,g,b].map(c => Math.pow(c*f, 0.8));
+}
+function renderPattern(){
+  const {a, d, lam} = par(), rgb = wl2rgb(lam), col = new Uint8ClampedArray(N*3), m = dmax();
+  for (let i = 0; i < N; i++){ const v = disp(intensity((i+.5)/N*XW-XW/2, a, lam, d), m); for (let k = 0; k < 3; k++) col[i*3+k] = rgb[k]*255*v; }
+  const px = img.data;
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++){ const o = (j*N+i)*4; px[o] = col[i*3]; px[o+1] = col[i*3+1]; px[o+2] = col[i*3+2]; px[o+3] = 255; }
+  pctx.putImageData(img,0,0);
+}
+
+// ---------- controls ----------
+[['lin','Linear intensity'],['log','Logarithmic (4 decades)']].forEach(([m,txt]) => { const b = document.createElement('button'); b.textContent = txt; b.dataset.m = m;
+  b.onclick = () => { scale = m; dirty = true; ui(); }; $('scales').appendChild(b); });
+[['Close slits',{dd:60}],['Widely spaced',{dd:300}],['d = 3a',{sw:40,dd:120}],['Wide slits',{sw:100,dd:200}],['Red light',{lam:650}],['Blue light',{lam:450}],['Zoom on weak fringes',{mx:1.6}],['Full range',{mx:3}]].forEach(([txt,v]) => { const b = document.createElement('button'); b.textContent = txt;
+  b.onclick = () => { Object.entries(v).forEach(([k,x]) => $(k).value = x); dirty = true; ui(); }; $('presets').appendChild(b); });
+['sw','dd','lam','mx'].forEach(id => $(id).addEventListener('input', () => { dirty = true; ui(); }));
+
+function ui(){
+  if (+$('dd').value < +$('sw').value) $('dd').value = $('sw').value;     // the slits cannot overlap: d >= a
+  const {a, d, lam} = par(), x1 = lam*L_M/a, dx = lam*L_M/d, r = d/a, ri = Math.round(r), isInt = Math.abs(r-ri) < 0.005;
+  $('swv').textContent = a + ' µm'; $('ddv').textContent = d + ' µm'; $('lamv').textContent = lam + ' nm';
+  const dm = dmax()*100; $('mxv').textContent = (dm >= 9.5 ? dm.toFixed(0) : dm.toFixed(1)) + ' %';
+  document.querySelectorAll('#scales button').forEach(b => b.classList.toggle('on', b.dataset.m === scale));
+  const n = isInt ? 2*ri-1 : 2*Math.floor(r)+1;
+  $('state').innerHTML = `Fringe spacing λL/d = <strong>${dx.toFixed(2)} mm</strong>. The envelope's first minimum is at ±λL/a = <strong>${x1.toFixed(1)} mm</strong>, ` +
+    `and about <strong>${n}</strong> bright fringes fit in the central peak (d/a = ${r.toFixed(2)}).` +
+    (isInt && ri >= 2 ? ` Since d/a is an integer, orders ±${ri}, ±${2*ri}, … are missing: they fall on envelope minima.` : '');
+}
+
+// ---------- drawing helpers ----------
+function line(c, pts, color, w, a = 1){
+  c.strokeStyle = color; c.lineWidth = w; c.globalAlpha = a; c.lineJoin = 'round'; c.lineCap = 'round'; c.beginPath();
+  pts.forEach((p,i) => i ? c.lineTo(p[0],p[1]) : c.moveTo(p[0],p[1])); c.stroke(); c.globalAlpha = 1;
+}
+function head(c, p0, p1, color, w){
+  line(c, [p0,p1], color, w);
+  const dx = p1[0]-p0[0], dy = p1[1]-p0[1], L = Math.hypot(dx,dy);
+  if (L < 3) return;
+  const h = Math.min(13, L*0.4), ux = dx/L, uy = dy/L;
+  c.fillStyle = color; c.beginPath(); c.moveTo(p1[0],p1[1]);
+  c.lineTo(p1[0]-h*ux+h*0.45*uy, p1[1]-h*uy-h*0.45*ux);
+  c.lineTo(p1[0]-h*ux-h*0.45*uy, p1[1]-h*uy+h*0.45*ux);
+  c.closePath(); c.fill();
+}
+function tag(c, txt, x, y){ c.lineWidth = 3; c.strokeStyle = 'rgba(0,0,0,.65)'; c.fillStyle = '#fff'; c.strokeText(txt,x,y); c.fillText(txt,x,y); }
+function axisArrow(c, p0, p1){
+  line(c,[p0,p1],'rgba(0,0,0,.65)',4); line(c,[p0,p1],'#fff',1.6);
+  const dx = p1[0]-p0[0], dy = p1[1]-p0[1], L = Math.hypot(dx,dy), ux = dx/L, uy = dy/L, h = 11;
+  c.beginPath(); c.moveTo(p1[0],p1[1]); c.lineTo(p1[0]-h*ux+h*.45*uy, p1[1]-h*uy-h*.45*ux); c.lineTo(p1[0]-h*ux-h*.45*uy, p1[1]-h*uy+h*.45*ux); c.closePath();
+  c.fillStyle = '#fff'; c.strokeStyle = 'rgba(0,0,0,.65)'; c.lineWidth = 1.5; c.fill(); c.stroke();
+}
+
+// ---------- screen view ----------
+function drawPattern(){
+  const W = cvp.clientWidth, H = cvp.clientHeight, m = W*MG, S = W-2*m, cx = W/2, cy = H/2, reach = S/2 + 0.8*m;
+  cp.imageSmoothingEnabled = true; cp.clearRect(0,0,W,H); cp.drawImage(pat,m,m,S,S);
+  cp.font = '13px system-ui,sans-serif';
+  axisArrow(cp,[cx,cy],[cx+reach,cy]); axisArrow(cp,[cx,cy],[cx,cy-reach]);
+  cp.fillStyle = colr('--text'); cp.fillText('x',cx+reach-8,cy+20); cp.fillText('y',cx+12,cy-reach+14);
+  const bw = 10/XW*S; line(cp,[[m+14,m+S-22],[m+14+bw,m+S-22]],'#fff',3); tag(cp,'10 mm',m+14,m+S-28);
+}
+
+function niceStep(r){ const e = Math.pow(10, Math.floor(Math.log10(r))), f = r/e; return (f < 1.5 ? 1 : f < 3.5 ? 2 : f < 7.5 ? 5 : 10)*e; }
+function drawProfile(){
+  const c = cl, W = cvl.clientWidth, H = cvl.clientHeight; c.clearRect(0,0,W,H);
+  const {a, d, lam} = par(), m = dmax();
+  const ml = 52, mr = 14, mt = 10, mb = 34, pw = W-ml-mr, ph = H-mt-mb;
+  const muted = colr('--muted'), grid = colr('--grid'), green = colr('--cs');
+  const X = x => ml + pw*(x+XW/2)/XW, Y = v => mt + ph*(1-v);
+  c.font = '12px system-ui,sans-serif'; c.fillStyle = muted; c.textAlign = 'right';
+  const ticks = scale === 'lin' ? [[0,'0'],[0.5,fmtTick(m/2)],[1,fmtTick(m)]] : [0,0.25,0.5,0.75,1].map(p => [p, fmtTick(m*Math.pow(10,4*(p-1)))]);
+  ticks.forEach(([v,t]) => { line(c,[[ml,Y(v)],[ml+pw,Y(v)]],grid,1); c.fillText(t,ml-6,Y(v)+4); });
+  const env = [];
+  for (let i = 0; i <= 500; i++){ const x = -XW/2 + XW*i/500; env.push([X(x), Y(disp(envelope(x,a,lam),m))]); }
+  c.setLineDash([5,4]); line(c,env,muted,1.3,0.9); c.setLineDash([]);
+  const n = 500, pts = [];
+  for (let i = 0; i <= n; i++){ const x = -XW/2 + XW*i/n; pts.push([X(x), Y(disp(intensity(x,a,lam,d),m))]); }
+  c.fillStyle = green; c.globalAlpha = 0.15; c.beginPath(); c.moveTo(ml,Y(0)); pts.forEach(q => c.lineTo(q[0],q[1])); c.lineTo(ml+pw,Y(0)); c.closePath(); c.fill(); c.globalAlpha = 1;
+  line(c,pts,green,2);
+  c.fillStyle = muted; c.textAlign = 'center';
+  for (let v = -XW/2; v <= XW/2+1e-9; v += 10){ line(c,[[X(v),mt+ph],[X(v),mt+ph+4]],muted,1); c.fillText(String(v),X(v),mt+ph+16); }
+  c.fillText('position x on the screen (mm)', ml+pw/2, H-4); c.textAlign = 'left';
+}
+
+// ---------- geometry view (isometric, right-handed: x lower right, y up, z upper right) ----------
+function draw3d(){
+  const c = c3, W = cv3.clientWidth, H = cv3.clientHeight;
+  c.clearRect(0,0,W,H);
+  const E = 1.5, Es = 1.9, zp = 5.0, zs = 2.3, sq2 = Math.SQRT2, sq6 = Math.sqrt(6);
+  const raw = (x,y,z) => [(x+z)/sq2, (-x+2*y+z)/sq6];
+  const keys = [[0,0,0],[1.4,0,0],[0,1.4,0],[0,0,zp+1.2]];
+  for (const a of [-1,1]) for (const b of [-1,1]) keys.push([a*(E+.1),b*(E+.1),zp],[a*Es,b*Es,zs]);
+  const kp = keys.map(k => raw(...k));
+  const x0 = Math.min(...kp.map(k=>k[0])), x1 = Math.max(...kp.map(k=>k[0]));
+  const y0 = Math.min(...kp.map(k=>k[1])), y1 = Math.max(...kp.map(k=>k[1]));
+  const aw = W-60, ah = H-40, s = Math.min(aw/(x1-x0), ah/(y1-y0));
+  const ox = 14 + (aw-s*(x1-x0))/2, oy = 14 + (ah-s*(y1-y0))/2;
+  const P = (x,y,z) => { const q = raw(x,y,z); return [ox + s*(q[0]-x0), oy + s*(y1-q[1])]; };
+  const muted = colr('--muted');
+  c.font = '13px system-ui,sans-serif'; c.fillStyle = muted;
+
+  // axes at the origin; the z axis runs through the slit and the centre of the screen
+  const O = P(0,0,0), C = P(0,0,zp);
+  line(c,[O,P(1.3,0,0)],muted,1.2); line(c,[O,P(0,1.3,0)],muted,1.2);
+  c.setLineDash([4,4]); line(c,[O,C],muted,1,0.7); c.setLineDash([]);
+  let q = P(1.3,0,0); c.fillText('x',q[0]+6,q[1]+4); q = P(0,1.3,0); c.fillText('y',q[0]+6,q[1]+4);
+
+  // observation screen carrying the diffraction pattern
+  const TL = P(-E,E,zp), TR = P(E,E,zp), BL = P(-E,-E,zp), BR = P(E,-E,zp);
+  c.save(); c.imageSmoothingEnabled = true;
+  c.transform((TR[0]-TL[0])/N,(TR[1]-TL[1])/N,(BL[0]-TL[0])/N,(BL[1]-TL[1])/N,TL[0],TL[1]);
+  c.drawImage(pat,0,0); c.restore();
+  line(c,[TL,TR,BR,BL,TL],muted,1.2,0.9);
+  line(c,[P(-E,0,zp),P(E,0,zp)],'#fff',1.2,0.6); line(c,[P(0,-E,zp),P(0,E,zp)],'#fff',1.2,0.6);
+  line(c,[P(E,0,zp),P(E+0.3,0,zp)],muted,1.2); line(c,[P(0,E,zp),P(0,E+0.3,zp)],muted,1.2);
+  c.fillStyle = muted; q = P(E+0.3,0,zp); c.fillText('x',q[0]+6,q[1]+4); q = P(0,E+0.3,zp); c.fillText('y',q[0]+6,q[1]+4);
+  q = P(E,-E,zp); c.fillText('screen',q[0]-18,q[1]+18);
+  // opaque plate with a slit (long along y); the slit width follows the slider
+  const {a, d} = par(), wv = 0.03 + (a-10)/90*0.2, sv = Math.max(0.2 + (d-30)/370*1.1, wv + 0.1), hs = 1.6;
+  const plate = [P(-Es,-Es,zs), P(Es,-Es,zs), P(Es,Es,zs), P(-Es,Es,zs)];
+  const slits = [-1,1].map(sg => { const xc = sg*sv/2; return [P(xc-wv/2,-hs,zs), P(xc+wv/2,-hs,zs), P(xc+wv/2,hs,zs), P(xc-wv/2,hs,zs)]; });
+  c.beginPath(); [plate,...slits].forEach(poly => { poly.forEach((p,i) => i ? c.lineTo(p[0],p[1]) : c.moveTo(p[0],p[1])); c.closePath(); });
+  c.fillStyle = muted; c.globalAlpha = 0.7; c.fill('evenodd'); c.globalAlpha = 1;
+  line(c,[...plate,plate[0]],muted,1.2,0.9); slits.forEach(sl => line(c,[...sl,sl[0]],colr('--text'),1,0.8));
+  c.fillStyle = muted; q = P(-Es,-Es,zs); c.fillText('slit plate',q[0]-14,q[1]+18);
+
+  head(c,C,P(0,0,zp+1.1),muted,1.5); q = P(0,0,zp+1.1); c.fillText('z',q[0]+8,q[1]+4);
+}
+
+function resize(){
+  const dpr = window.devicePixelRatio || 1;
+  [[cv3,c3],[cvp,cp],[cvl,cl]].forEach(([c,x]) => { const r = c.getBoundingClientRect();
+    c.width = Math.round(r.width*dpr); c.height = Math.round(r.height*dpr); x.setTransform(dpr,0,0,dpr,0,0); });
+}
+addEventListener('resize', resize);
+
+function frame(){
+  if (dirty){ renderPattern(); dirty = false; }
+  drawPattern(); drawProfile(); draw3d();
+  requestAnimationFrame(frame);
+}
+resize(); ui(); requestAnimationFrame(frame);
+</script>
+</body>
+</html>

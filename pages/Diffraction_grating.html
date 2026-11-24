@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Diffraction grating</title>
+<style>
+:root{
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+  --bg:#f7f7f5;--panel:#ffffff;--text:#1d1d1f;--muted:#6b6b70;--grid:#d9d9d4;--border:#e2e2dc;--cs:#059669;--c1:#2563eb;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){--bg:#17181a;--panel:#212326;--text:#ececec;--muted:#9a9aa0;--grid:#3a3c40;--border:#34363a;--cs:#34d399;--c1:#6ea0ff;color-scheme:dark}
+}
+:root[data-theme="dark"]{--bg:#17181a;--panel:#212326;--text:#ececec;--muted:#9a9aa0;--grid:#3a3c40;--border:#34363a;--cs:#34d399;--c1:#6ea0ff;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:1500px;margin:0 auto;padding:16px}
+h1{font-size:1.35rem;margin:.2em 0 .6em}
+h2{font-size:1rem;margin:0 0 8px;color:var(--muted);font-weight:600}
+p.sub{margin:0;color:var(--muted);font-size:.82rem}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:12px}
+canvas{display:block;width:min(100%,max(280px,calc(100vh - 300px)));margin:0 auto;touch-action:none;cursor:crosshair}
+#cvg{aspect-ratio:1/1}
+#cvp{aspect-ratio:1.15/1}
+.views{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) 310px;gap:16px;align-items:start}
+@media (max-width:1100px){.views{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.controls{grid-column:1 / -1;position:static !important;max-height:none !important}}
+@media (max-width:760px){.views{grid-template-columns:minmax(0,1fr)}}
+.controls{display:grid;gap:10px;position:sticky;top:12px;max-height:calc(100vh - 24px);overflow-y:auto}
+.sl{margin-bottom:6px}
+label{display:flex;justify-content:space-between;font-size:.92rem;margin-bottom:2px}
+label b{font-variant-numeric:tabular-nums}
+input[type=range]{width:100%}
+.row{display:flex;gap:6px;flex-wrap:wrap}
+button{background:var(--panel);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:4px 10px;font:inherit;font-size:.85rem;cursor:pointer}
+button:hover{border-color:var(--muted)}
+button.on{border-color:var(--cs);color:var(--cs)}
+.state{font-size:.88rem}
+.state strong{color:var(--cs)}
+.state p{margin:0 0 6px}
+#wl{max-height:190px;overflow-y:auto;padding-right:2px;margin-bottom:6px}
+.wrow{display:grid;grid-template-columns:14px 1fr 52px 24px;gap:6px;align-items:center;margin-bottom:4px}
+.wrow .sw{width:14px;height:14px;border-radius:50%}
+.wrow b{font-size:.85rem;font-variant-numeric:tabular-nums;text-align:right}
+.wrow button{padding:0;line-height:20px;height:22px}
+.back{display:inline-block;margin:0 0 6px;font-size:.9rem;color:var(--muted);text-decoration:none}
+.back:hover{color:var(--cs);text-decoration:underline}
+</style>
+</head>
+<body>
+<main>
+  <a class="back" href="../index.html">← Back to the menu</a>
+  <h1>Diffraction grating</h1>
+
+  <div class="views">
+    <div class="card">
+      <h2>Geometry: the grating in the yz plane</h2>
+      <canvas id="cvg"></canvas>
+      <p class="sub" style="margin-top:8px">View in the yz plane; the slits are long along x (out of the page). A plane wave arrives along +z. Click or drag in the figure to change the angle θ, measured from the z axis (positive upwards). The strip on the screen shows the pattern; each wavelength is drawn in its own colour, and the colours add up.</p>
+    </div>
+
+    <div class="card">
+      <h2>Pattern as a function of the angle θ</h2>
+      <canvas id="cvp"></canvas>
+      <p class="sub" style="margin-top:8px">Top: the pattern as it appears on a screen. Below: the intensity, normalised to the principal maximum. Each wavelength has its own curve (with up to three wavelengths, its dashed envelope and order lines too). Because different wavelengths do not interfere, the intensities simply add on the screen. Click or drag to set the angle θ (orange).</p>
+    </div>
+
+    <div class="card controls">
+      <div>
+        <div class="sl"><label for="nn"><span>Number of slits, N</span> <b id="nnv"></b></label><input id="nn" type="range" min="2" max="50" step="1" value="5"></div>
+        <div class="sl"><label for="dd"><span>Distance between the slits, d</span> <b id="ddv"></b></label><input id="dd" type="range" min="1" max="10" step="0.1" value="3"></div>
+        <div class="sl"><label for="aa"><span>Slit width, a</span> <b id="aav"></b></label><input id="aa" type="range" min="0.2" max="10" step="0.1" value="1"></div>
+        <div class="sl"><label><span>Wavelengths in the incident light</span> <b id="nwv"></b></label>
+          <div id="wl"></div>
+          <div class="row"><button id="addwl">+ Add a wavelength</button></div></div>
+        <div class="sl"><label for="thr"><span>Angular range shown, ±</span> <b id="thrv"></b></label><input id="thr" type="range" min="5" max="90" step="1" value="30"></div>
+        <div class="sl"><label for="mx"><span>Display maximum (fraction of peak)</span> <b id="mxv"></b></label><input id="mx" type="range" min="0" max="3" step="0.05" value="3">
+          <p class="sub">Lowering it makes weak maxima visible.</p></div>
+      </div>
+      <div class="row" id="scales"></div>
+      <div class="row" id="presets"></div>
+      <div class="row" id="lights"></div>
+      <div class="state" id="state"></div>
+    </div>
+  </div>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const cvg = $('cvg'), cg = cvg.getContext('2d'), cvp = $('cvp'), cpt = cvp.getContext('2d');
+const colr = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const ORANGE = '#f59e0b', RAD = Math.PI/180;
+let scale = 'log', thC = 7*RAD;                          // display scale, selected angle θ (radians, positive upwards / to the right)
+
+// ---------- physics ----------
+// Fraunhofer N-slit grating at normal incidence:  I(θ) = sinc²(π a sinθ/λ) · [sin(Nβ)/(N sinβ)]²,  β = π d sinθ/λ
+// principal maxima at d sinθ = m λ; N-2 weak secondary maxima between neighbouring orders.
+const par = () => { const d = +$('dd').value; return {N:+$('nn').value, d, a:Math.min(+$('aa').value, d)}; };
+let src = [550];                                   // wavelengths (nm) of the incident light
+const MAXSRC = 16;
+function envelope(t, p, lam){ const u = Math.PI*p.a*Math.sin(t)/lam; return Math.abs(u) < 1e-9 ? 1 : Math.pow(Math.sin(u)/u, 2); }
+function grating(t, p, lam){ const b = Math.PI*p.d*Math.sin(t)/lam, sb = Math.sin(b); return Math.abs(sb) < 1e-7 ? 1 : Math.pow(Math.sin(p.N*b)/(p.N*sb), 2); }
+const Ith = (t, p, lam) => envelope(t,p,lam)*grating(t,p,lam);        // lam in µm
+const dmax = () => Math.pow(10, +$('mx').value - 3);
+const disp = (I, m) => scale === 'lin' ? Math.min(1, I/m) : Math.min(1, Math.max(0, (Math.log10(Math.max(I/m,1e-12))+4)/4));
+function wl2rgb(w){
+  let r = 0, g = 0, b = 0;
+  if (w < 440){ r = (440-w)/60; b = 1; } else if (w < 490){ g = (w-440)/50; b = 1; } else if (w < 510){ g = 1; b = (510-w)/20; }
+  else if (w < 580){ r = (w-510)/70; g = 1; } else if (w < 645){ r = 1; g = (645-w)/65; } else r = 1;
+  const f = w < 420 ? 0.3+0.7*(w-400)/20 : w > 700 ? 0.3+0.7*(750-w)/50 : 1;
+  return [r,g,b].map(c => Math.pow(c*f, 0.8));
+}
+function lineColor(nm){ const c = wl2rgb(nm), m = Math.max(...c); return `rgb(${c[0]/m*255|0},${c[1]/m*255|0},${c[2]/m*255|0})`; }
+// additive colour mixing of the wavelengths, normalised so that the centre (all wavelengths in phase) does not saturate
+function mixer(){
+  const R = src.map(wl2rgb), S = [0,0,0]; R.forEach(c => { S[0] += c[0]; S[1] += c[1]; S[2] += c[2]; });
+  const nm = Math.max(S[0],S[1],S[2],1e-9);
+  return {R, color: v => { let r = 0, g = 0, b = 0; for (let k = 0; k < R.length; k++){ r += R[k][0]*v[k]; g += R[k][1]*v[k]; b += R[k][2]*v[k]; }
+    return `rgb(${Math.min(255,r/nm*255)|0},${Math.min(255,g/nm*255)|0},${Math.min(255,b/nm*255)|0})`; }};
+}
+const sup = n => String(n).split('').map(d => '⁰¹²³⁴⁵⁶⁷⁸⁹'[d]).join('');
+function fmtTick(v){
+  if (v >= 0.01 && v <= 1) return String(+v.toPrecision(2));
+  const e = Math.floor(Math.log10(v)+1e-9), mt = v/Math.pow(10,e);
+  return (Math.abs(mt-1) < 0.05 ? '' : Math.round(mt)+'×') + '10' + (e < 0 ? '⁻' : '') + sup(Math.abs(e));
+}
+const tickSet = () => { const m = dmax();
+  return scale === 'lin' ? [[0,'0'],[0.5,fmtTick(m/2)],[1,fmtTick(m)]] : [0,0.5,1].map(p => [p, fmtTick(m*Math.pow(10,4*(p-1)))]); };
+function niceStep(r){ const e = Math.pow(10, Math.floor(Math.log10(r))), f = r/e; return (f < 1.5 ? 1 : f < 3.5 ? 2 : f < 7.5 ? 5 : 10)*e; }
+
+// ---------- controls ----------
+[['lin','Linear intensity'],['log','Logarithmic (4 decades)']].forEach(([m,txt]) => { const b = document.createElement('button'); b.textContent = txt; b.dataset.m = m;
+  b.onclick = () => { scale = m; ui(); }; $('scales').appendChild(b); });
+const range = (a,b,st) => { const o = []; for (let v = a; v <= b; v += st) o.push(v); return o; };
+const mkPre = (box, list) => list.forEach(([txt,v]) => { const b = document.createElement('button'); b.textContent = txt;
+  b.onclick = () => { Object.entries(v).forEach(([k,x]) => { if (k === 'src'){ src = x.slice(); renderList(); } else $(k).value = x; }); ui(); }; $(box).appendChild(b); });
+mkPre('presets',[['N = 2',{nn:2}],['N = 5',{nn:5}],['N = 20',{nn:20}],['Fine grating',{dd:1.5,aa:0.5,thr:60}],['Coarse grating',{dd:8,aa:2,thr:10}]]);
+mkPre('lights',[['One wavelength',{src:[550]}],['Red + green + blue',{src:[650,550,450]}],['Mercury lamp',{src:[405,436,546,578]}],['White light',{src:range(400,700,25),nn:10,thr:35}]]);
+['nn','dd','aa','thr','mx'].forEach(id => $(id).addEventListener('input', ui));
+
+function renderList(){
+  const box = $('wl'); box.innerHTML = '';
+  src.forEach((_,i) => {
+    const row = document.createElement('div'); row.className = 'wrow';
+    const sw = document.createElement('span'); sw.className = 'sw';
+    const r = document.createElement('input'); r.type = 'range'; r.min = 400; r.max = 750; r.step = 5; r.value = src[i];
+    const t = document.createElement('b'), x = document.createElement('button'); x.textContent = '×'; x.title = 'Remove this wavelength';
+    const upd = () => { sw.style.background = lineColor(src[i]); t.textContent = src[i] + ' nm'; };
+    r.oninput = () => { src[i] = +r.value; upd(); ui(); };
+    x.onclick = () => { if (src.length > 1){ src.splice(i,1); renderList(); ui(); } };
+    upd(); row.append(sw, r, t, x); box.appendChild(row);
+  });
+}
+$('addwl').onclick = () => {                            // pick the wavelength that is furthest from those already present
+  if (src.length >= MAXSRC) return;
+  let best = 550, bd = -1; for (let w = 400; w <= 750; w += 5){ const d = Math.min(...src.map(s => Math.abs(s-w))); if (d > bd){ bd = d; best = w; } }
+  src.push(best); renderList(); ui();
+};
+
+function ui(){
+  const d = +$('dd').value; $('aa').max = d; if (+$('aa').value > d) $('aa').value = d;     // the slit cannot be wider than the period
+  const p = par(), dm = dmax()*100, deg = t => (t/RAD).toFixed(1), n = src.length;
+  $('nnv').textContent = p.N; $('ddv').textContent = p.d.toFixed(1) + ' µm'; $('aav').textContent = p.a.toFixed(1) + ' µm';
+  $('nwv').textContent = n + (n === 1 ? ' wavelength' : ' wavelengths'); $('addwl').disabled = n >= MAXSRC;
+  $('thrv').textContent = $('thr').value + '°';
+  $('mxv').textContent = (dm >= 9.5 ? dm.toFixed(0) : dm.toFixed(1)) + ' %';
+  document.querySelectorAll('#scales button').forEach(b => b.classList.toggle('on', b.dataset.m === scale));
+  const srt = src.slice().sort((a,b) => a-b), lmin = srt[0]/1000, lmax = srt[n-1]/1000, lmed = srt[n >> 1]/1000;
+  const th1 = l => l < p.d ? deg(Math.asin(l/p.d)) + '°' : 'none';
+  const r = p.d/p.a, ri = Math.round(r), isInt = Math.abs(r-ri) < 0.005 && ri >= 2;
+  let h = '';
+  if (n === 1){
+    const mmax = Math.floor(p.d/lmin - 1e-9), list = [];
+    for (let m = 1; m <= Math.min(mmax,4); m++) list.push(`θ<sub>${m}</sub> = ${deg(Math.asin(m*lmin/p.d))}°`);
+    h += `<p>Grating equation d sin θ = mλ: ${mmax >= 1 ? 'orders m = 0, ±1' + (mmax > 1 ? '…±' + mmax : '') + ' exist; ' + list.join(', ') + '.' : 'only the central order m = 0 exists (d < λ).'}</p>`;
+  } else {
+    h += `<p>Each wavelength obeys d sin θ = mλ, so every order m ≠ 0 spreads the colours into a spectrum. In the first order, ${srt[0]} nm is at <strong>${th1(lmin)}</strong> and ${srt[n-1]} nm at <strong>${th1(lmax)}</strong>. The order m = 0 has no dispersion: all wavelengths coincide (white light stays white).</p>`;
+    const rr = lmax/lmin;
+    if (rr > 1){ const mo = Math.ceil(1/(rr-1) - 1e-9); h += `<p>The spectra of orders ${mo} and ${mo+1} start to overlap (when λ<sub>max</sub>/λ<sub>min</sub> &gt; (m+1)/m).</p>`; }
+  }
+  h += `<p>Width of a principal maximum ≈ λ/(Nd) = <strong>${(lmed/(p.N*p.d)/RAD).toFixed(2)}°</strong> at ${Math.round(lmed*1000)} nm: more slits give sharper peaks, so closely spaced colours can be separated. There are ${p.N-2} weak secondary maxima between neighbouring orders.</p>`;
+  if (isInt) h += `<p>Since d/a = ${ri}, orders ±${ri}, ±${2*ri}, … are missing.</p>`;
+  const per = n <= 4 ? src.map(w => `${w} nm: ${(Ith(thC,p,w/1000)*100).toFixed(1)} %`).join(', ') : 'see the plot';
+  h += `<p>At the selected angle θ = <strong>${deg(thC)}°</strong>, relative intensity: ${per}.</p>`;
+  $('state').innerHTML = h;
+}
+
+// ---------- drawing helpers ----------
+function line(c, pts, color, w, a = 1){
+  c.strokeStyle = color; c.lineWidth = w; c.globalAlpha = a; c.lineJoin = 'round'; c.lineCap = 'round'; c.beginPath();
+  pts.forEach((p,i) => i ? c.lineTo(p[0],p[1]) : c.moveTo(p[0],p[1])); c.stroke(); c.globalAlpha = 1;
+}
+function head(c, p0, p1, color, w){
+  line(c, [p0,p1], color, w);
+  const dx = p1[0]-p0[0], dy = p1[1]-p0[1], L = Math.hypot(dx,dy);
+  if (L < 3) return;
+  const h = Math.min(11, L*0.4), ux = dx/L, uy = dy/L;
+  c.fillStyle = color; c.beginPath(); c.moveTo(p1[0],p1[1]);
+  c.lineTo(p1[0]-h*ux+h*0.45*uy, p1[1]-h*uy-h*0.45*ux);
+  c.lineTo(p1[0]-h*ux-h*0.45*uy, p1[1]-h*uy+h*0.45*ux);
+  c.closePath(); c.fill();
+}
+
+// ---------- geometry view (yz plane: z to the right, y up) ----------
+function drawGeometry(){
+  const c = cg, W = cvg.clientWidth, H = cvg.clientHeight; c.clearRect(0,0,W,H);
+  const p = par(), muted = colr('--muted'), text = colr('--text'), blue = colr('--c1'), n = src.length;
+  const gx = 0.30*W, sx = 0.80*W, cy = H/2, L = sx-gx, half = 0.46*H;
+  c.font = '13px system-ui,sans-serif'; c.textAlign = 'left';
+
+  // optical axis and incident plane wave
+  c.setLineDash([4,4]); line(c,[[0.03*W,cy],[sx+0.08*W,cy]],muted,1,0.7); c.setLineDash([]);
+  [-2,-1,0,1,2].forEach(k => head(c,[0.04*W,cy+k*0.11*H],[gx-8,cy+k*0.11*H],blue,2));
+  c.fillStyle = blue; c.fillText(n === 1 ? 'plane wave' : `plane wave (${n} wavelengths)`, 0.04*W, cy-2*0.11*H-12);
+
+  // the grating: an opaque wall with N slits (long along x, out of the page)
+  const sv = Math.min(0.62*H/p.N, 0.0233*H*p.d), gw = Math.max(1.5, 0.5*sv*p.a/p.d), gaps = [];
+  for (let k = 0; k < p.N; k++){ const yk = cy - (k-(p.N-1)/2)*sv; gaps.push([yk-gw, yk+gw]); }
+  gaps.sort((a,b) => a[0]-b[0]);
+  c.strokeStyle = text; c.lineWidth = 5; c.lineCap = 'butt'; c.beginPath();
+  let y0 = cy-half; gaps.forEach(g => { if (g[0] > y0){ c.moveTo(gx,y0); c.lineTo(gx,g[0]); } y0 = g[1]; });
+  c.moveTo(gx,y0); c.lineTo(gx,cy+half); c.stroke();
+  c.fillStyle = muted; c.textAlign = 'center'; c.fillText('grating', gx, cy+half+16); c.fillText(`N = ${p.N}, d = ${p.d.toFixed(1)} µm`, gx, cy+half+32);
+
+  // screen showing the colour pattern (screen position y = L tanθ)
+  const mx = mixer(), m = dmax();
+  c.fillStyle = '#000'; c.fillRect(sx-5, cy-half, 10, 2*half);
+  const v = new Array(n);
+  for (let y = cy-half; y < cy+half; y += 2){
+    for (let k = 0; k < n; k++){ let I = 0; for (let s = 0; s < 3; s++) I = Math.max(I, Ith(Math.atan((cy-(y+s*0.67))/L), p, src[k]/1000)); v[k] = disp(I,m); }
+    c.fillStyle = mx.color(v); c.fillRect(sx-5, y, 10, 2);
+  }
+  line(c,[[sx-5,cy-half],[sx+5,cy-half],[sx+5,cy+half],[sx-5,cy+half],[sx-5,cy-half]],muted,1);
+  c.fillStyle = muted; c.fillText('screen', sx, cy+half+16);
+
+  // end point of a ray leaving the centre of the grating at angle t (clipped at the top and bottom of the figure)
+  const endPt = t => { const tn = Math.tan(t), yE = cy - L*tn;
+    return Math.abs(yE-cy) > half ? [gx + half/Math.abs(tn), cy - Math.sign(tn)*half] : [sx, yE]; };
+
+  // directions of the diffraction orders: one line per wavelength, in its colour
+  c.textAlign = 'left';
+  for (let mo = 1; mo <= 3; mo++) [-1,1].forEach(sg => {
+    src.forEach(w => { const sn = mo*w/1000/p.d; if (sn >= 1) return; const e = endPt(sg*Math.asin(sn));
+      if (n <= 5) line(c,[[gx,cy],e],'rgba(0,0,0,.3)',3.2);
+      line(c,[[gx,cy],e],lineColor(w),1.4,0.9); });
+    const sn = mo*src[n >> 1]/1000/p.d; if (sn < 1){ const e = endPt(sg*Math.asin(sn)); if (e[0] === sx){ c.fillStyle = muted; c.fillText('m = ' + (sg > 0 ? '+' : '−') + mo, sx+10, e[1]+4); } }
+  });
+
+  // the selected ray at angle θ, with the arc and its label
+  const e = endPt(thC);
+  head(c,[gx,cy],e,ORANGE,2.5);
+  const r = 0.16*W; c.strokeStyle = ORANGE; c.lineWidth = 1.5; c.beginPath(); c.arc(gx,cy,r,0,-thC,thC > 0); c.stroke();
+  c.fillStyle = ORANGE; c.font = '14px system-ui,sans-serif';
+  c.fillText(`θ = ${(thC/RAD).toFixed(1)}°`, gx + (r+8)*Math.cos(thC/2), cy - (r+8)*Math.sin(thC/2) + 4);
+  c.font = '13px system-ui,sans-serif';
+
+  // axes
+  const ox = 0.05*W, oy = H-0.07*H;
+  head(c,[ox,oy],[ox+0.09*W,oy],muted,1.5); head(c,[ox,oy],[ox,oy-0.09*W],muted,1.5);
+  c.fillStyle = muted; c.fillText('z', ox+0.09*W+6, oy+4); c.fillText('y', ox-4, oy-0.09*W-8);
+}
+
+// ---------- pattern as a function of θ ----------
+const pLay = () => { const W = cvp.clientWidth, H = cvp.clientHeight, ml = 48, mr = 14, mt = 22, mb = 38, sh = Math.max(26,0.17*H);
+  return {W, H, ml, mr, mt, mb, sh, pw: W-ml-mr, y1: mt+sh+6, bot: H-mb}; };
+function drawPattern(){
+  const c = cpt, {W, H, ml, mt, sh, pw, y1, bot} = pLay(), ph = bot-y1; c.clearRect(0,0,W,H);
+  const p = par(), n = src.length, thw = +$('thr').value*RAD, thwD = +$('thr').value, muted = colr('--muted');
+  const mx = mixer(), m = dmax(), nP = Math.floor(pw);
+  const vals = src.map(w => { const a = new Float32Array(nP), lam = w/1000;
+    for (let i = 0; i < nP; i++){                                    // maximum over several sub-samples so that narrow peaks stay visible
+      let q = 0; for (let s = 0; s < 6; s++) q = Math.max(q, Ith(-thw + 2*thw*((i+(s+.5)/6)/pw), p, lam)); a[i] = q; }
+    return a; });
+  const X = d => ml + pw*(d+thwD)/(2*thwD);                           // x position from an angle in degrees
+  c.font = '11px system-ui,sans-serif'; c.textAlign = 'left';
+  // strip: the colour pattern as seen on a screen
+  const v = new Array(n);
+  for (let i = 0; i < nP; i++){ for (let k = 0; k < n; k++) v[k] = disp(vals[k][i],m); c.fillStyle = mx.color(v); c.fillRect(ml+i, mt, 1.3, sh); }
+  c.strokeStyle = muted; c.lineWidth = 1; c.strokeRect(ml, mt, pw, sh);
+  // plot area (dark, so that the spectral colours stand out)
+  c.fillStyle = '#14151a'; c.fillRect(ml, y1, pw, ph);
+  tickSet().forEach(([t,lab]) => { const y = bot-ph*t; line(c,[[ml,y],[ml+pw,y]],'#3a3c40',1); c.fillStyle = muted; c.textAlign = 'right'; c.fillText(lab,ml-5,y+4); });
+  c.strokeStyle = muted; c.strokeRect(ml, y1, pw, ph);
+  const step = niceStep(2*thwD/6); c.textAlign = 'center'; c.fillStyle = muted;
+  for (let t = Math.ceil(-thwD/step)*step; t <= thwD+1e-9; t += step){ const x = X(t); line(c,[[x,bot],[x,bot+4]],muted,1); c.fillText(String(+t.toFixed(2)),x,bot+16); }
+  c.fillText('angle θ (degrees)', ml+pw/2, H-6);
+  // order labels (for the median wavelength) and order lines (few wavelengths only)
+  const lmed = src.slice().sort((a,b) => a-b)[n >> 1]/1000, mmax = Math.floor(p.d/lmed - 1e-9);
+  const pxSp = pw*Math.asin(Math.min(1,lmed/p.d))/thw, every = Math.max(1, Math.ceil(24/Math.max(pxSp,1e-6)));
+  for (let mo = -mmax; mo <= mmax; mo++){ const t = Math.asin(mo*lmed/p.d)/RAD; if (Math.abs(t) > thwD || mo % every) continue; c.fillStyle = muted; c.fillText(String(mo), X(t), mt-6); }
+  c.textAlign = 'left'; c.fillStyle = muted; c.fillText('order m', 4, mt-6);
+  if (n <= 4) src.forEach(w => { const lam = w/1000, mm = Math.floor(p.d/lam - 1e-9); c.setLineDash([3,4]);
+    for (let mo = -mm; mo <= mm; mo++){ const t = Math.asin(mo*lam/p.d)/RAD; if (Math.abs(t) <= thwD) line(c,[[X(t),y1],[X(t),bot]],lineColor(w),1,0.4); } c.setLineDash([]); });
+  // envelopes (up to three wavelengths) and the intensity of each wavelength
+  if (n <= 3) src.forEach(w => { c.setLineDash([5,4]); line(c,Array.from({length:nP},(_,i) => [ml+i+.5, bot-ph*disp(envelope(-thw+2*thw*((i+.5)/pw),p,w/1000),m)]),lineColor(w),1.2,0.6); c.setLineDash([]); });
+  src.forEach((w,k) => { const pts = Array.from(vals[k],(q,i) => [ml+i+.5, bot-ph*disp(q,m)]);
+    c.fillStyle = lineColor(w); c.globalAlpha = n > 4 ? 0.06 : 0.14; c.beginPath(); c.moveTo(ml,bot); pts.forEach(q => c.lineTo(q[0],q[1])); c.lineTo(ml+nP,bot); c.closePath(); c.fill(); c.globalAlpha = 1;
+    line(c,pts,lineColor(w),n > 4 ? 1.2 : 1.7); });
+  // selected angle
+  const td = thC/RAD;
+  if (Math.abs(td) <= thwD){ c.setLineDash([6,4]); line(c,[[X(td),mt],[X(td),bot]],ORANGE,1.8); c.setLineDash([]);
+    c.fillStyle = ORANGE; c.beginPath(); c.moveTo(X(td)-5,mt-7); c.lineTo(X(td)+5,mt-7); c.lineTo(X(td),mt-1); c.closePath(); c.fill(); }
+}
+
+// ---------- pointer interaction ----------
+const clampA = (t, lim) => Math.max(-lim, Math.min(lim, t));
+let dragG = false, dragP = false;
+const setFromGeometry = e => { const r = cvg.getBoundingClientRect(), W = cvg.clientWidth, H = cvg.clientHeight;
+  const px = (e.clientX-r.left)*W/r.width, py = (e.clientY-r.top)*H/r.height;
+  thC = clampA(Math.atan2(H/2-py, Math.max(px-0.30*W, 3)), 89*RAD); ui(); };
+const setFromPattern = e => { const r = cvp.getBoundingClientRect(), {W, ml, pw} = pLay(), px = (e.clientX-r.left)*W/r.width, thw = +$('thr').value*RAD;
+  thC = clampA(-thw + 2*thw*(px-ml)/pw, thw); ui(); };
+cvg.addEventListener('pointerdown', e => { dragG = true; cvg.setPointerCapture(e.pointerId); e.preventDefault(); setFromGeometry(e); });
+cvg.addEventListener('pointermove', e => { if (dragG) setFromGeometry(e); });
+cvp.addEventListener('pointerdown', e => { dragP = true; cvp.setPointerCapture(e.pointerId); e.preventDefault(); setFromPattern(e); });
+cvp.addEventListener('pointermove', e => { if (dragP) setFromPattern(e); });
+['pointerup','pointercancel'].forEach(ev => { cvg.addEventListener(ev, () => { dragG = false; }); cvp.addEventListener(ev, () => { dragP = false; }); });
+
+function resize(){
+  const dpr = window.devicePixelRatio || 1;
+  [[cvg,cg],[cvp,cpt]].forEach(([c,x]) => { const r = c.getBoundingClientRect();
+    c.width = Math.round(r.width*dpr); c.height = Math.round(r.height*dpr); x.setTransform(dpr,0,0,dpr,0,0); });
+}
+addEventListener('resize', resize);
+function frame(){ drawGeometry(); drawPattern(); requestAnimationFrame(frame); }
+renderList(); resize(); ui(); requestAnimationFrame(frame);
+</script>
+</body>
+</html>
